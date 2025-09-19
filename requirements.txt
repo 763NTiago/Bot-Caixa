@@ -1,0 +1,7 @@
+Flask
+Flask-SQLAlchemy
+pandas
+requests
+beautifulsoup4
+numpy
+openpyxl

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oportunidades Abaixo de R$100 mil</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.5/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+        :root {
+            --primary-color: #8e44ad; --secondary-color: #3498db; --background-start: #1a1a2e;
+            --background-end: #16213e; --card-bg: #1f2847; --text-color: #e0e0e0;
+            --border-color: #2c3e50; --font-family: 'Poppins', sans-serif;
+            --dark-text-color: #efeff3da; --orange-color: #f39c12;
+        }
+        body { 
+            background: linear-gradient(-45deg, var(--background-start), var(--background-end)); 
+            color: var(--text-color); 
+            font-family: var(--font-family); 
+        }
+        h1 { color: var(--secondary-color); font-weight: 600; }
+        .card { 
+            background-color: var(--card-bg); 
+            border: 1px solid var(--border-color); 
+            border-radius: 10px; 
+        }
+        
+        .dataTables_wrapper .dataTables_info,
+        .dataTables_wrapper .dataTables_paginate {
+            background-color: var(--card-bg); 
+            padding: 5px 10px;
+            border-radius: 5px;
+            color: var(--dark-text-color) !important; 
+        }
+        .dataTables_wrapper .dataTables_paginate .page-item .page-link {
+            background-color: var(--card-bg) !important;
+            color: var(--dark-text-color) !important;
+            border-color: var(--border-color) !important;
+        }
+        .dataTables_wrapper .dataTables_paginate .page-item.active .page-link {
+            background-color: var(--secondary-color) !important;
+            color: var(--text-color) !important; 
+            border-color: var(--secondary-color) !important;
+        }
+        .dataTables_wrapper .dataTables_length, 
+        .dataTables_wrapper .dataTables_filter { 
+            color: var(--text-color) !important; 
+        }
+
+        .table { 
+            --bs-table-bg: var(--card-bg); 
+            --bs-table-border-color: var(--border-color); 
+            --bs-table-striped-bg: #253154; 
+        }
+        .table tbody tr { cursor: pointer; }
+        .table tbody tr:hover { background-color: var(--secondary-color) !important; }
+        
+        .form-select, .form-control {
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            border-color: var(--border-color);
+        }
+        .form-select option {
+            background-color: var(--card-bg);
+            color: var(--text-color);
+        }
+
+        .price-column { color: #2ecc71 !important; font-weight: 600; }
+        .discount-column { color: #e74c3c !important; font-weight: 600; }
+        .area-column { color: #3498db !important; }
+        .preco-m2-column { color: var(--orange-color) !important; font-weight: 600; }
+        .tipo-column { color: #9b59b6 !important; font-weight: 500; }
+
+        .status-novo { background: rgba(46, 204, 113, 0.2) !important; color: #2ecc71 !important; border: 1px solid #2ecc71 !important; }
+        .status-existente { background: rgba(52, 152, 219, 0.2) !important; color: #3498db !important; border: 1px solid #3498db !important; }
+        .status-atualizado { background: rgba(204, 255, 0, 0.2) !important; color: #ccff00 !important; border: 1px solid #ccff00 !important; }
+        .status-expirado { background: rgba(231, 76, 60, 0.2) !important; color: #e74c3c !important; border: 1px solid #e74c3c !important; }
+
+        .btn-warning {
+            background: linear-gradient(135deg, var(--orange-color), #e67e22);
+            color: white; border: none;
+        }
+        .btn-warning:hover { color: white; }
+        .filter-actions { display: flex; gap: 10px; }
+        @media (max-width: 768px) { .filter-actions { flex-direction: column; } }
+    </style>
+</head>
+<body>
+    <div class="container-fluid px-4 mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="bi bi-gem"></i> Oportunidades Abaixo de R$100 mil</h1>
+            <div class="d-flex gap-2">
+                <a href="/" class="btn btn-outline-secondary">
+                    <i class="bi bi-house-door"></i> Dashboard
+                </a>
+                <a href="/comparacao" class="btn btn-outline-secondary">
+                    <i class="bi bi-diagram-3"></i> Comparação
+                </a>
+            </div>
+        </div>
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row g-2 mb-4">
+                    <div class="col-lg-2 col-md-4 col-sm-6">
+                        <select id="uf-filter" class="form-select">
+                            <option value="">Todos os Estados</option>
+                        </select>
+                    </div>
+                    <div class="col-lg-2 col-md-4 col-sm-6">
+                        <select id="cidade-filter" class="form-select">
+                            <option value="">Todas as Cidades</option>
+                        </select>
+                    </div>
+                    <div class="col-lg-2 col-md-4 col-sm-6">
+                        <select id="bairro-filter" class="form-select">
+                            <option value="">Todos os Bairros</option>
+                        </select>
+                    </div>
+                    <div class="col-lg-2 col-md-4 col-sm-6">
+                        <select id="tipo-filter" class="form-select">
+                            <option value="">Todas as Tipologias</option>
+                        </select>
+                    </div>
+                    <div class="col-lg-2 col-md-4 col-sm-6">
+                        <select id="modalidade-filter" class="form-select">
+                            <option value="">Todas as Modalidades</option>
+                        </select>
+                    </div>
+                    <div class="col-lg-2 col-md-4 col-sm-6">
+                        <select id="fgts-filter" class="form-select">
+                            <option value="">FGTS?</option>
+                            <option value="SIM">Sim</option>
+                            <option value="NÃO">Não</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row g-2 mb-4">
+                    <div class="col-lg-2 col-md-4 col-sm-6">
+                        <select id="financiamento-filter" class="form-select">
+                            <option value="">Financiamento?</option>
+                            <option value="SIM">Sim</option>
+                            <option value="NÃO">Não</option>
+                        </select>
+                    </div>
+                    <div class="col-lg-2 col-md-4 col-sm-6">
+                        <select id="status-filter" class="form-select">
+                            <option value="Ativos" selected>Status: Ativos</option>
+                            <option value="Apenas Novos">Status: Apenas Novos</option>
+                            <option value="Expirado">Status: Expirado</option>
+                            <option value="Todos">Status: Todos</option>
+                        </select>
+                    </div>
+                    <div class="col-lg-2 col-md-4 col-sm-6">
+                        <input type="number" id="preco-min-filter" class="form-control" placeholder="Preço Mínimo">
+                    </div>
+                    <div class="col-lg-2 col-md-4 col-sm-6">
+                        <input type="number" id="preco-max-filter" class="form-control" placeholder="Preço Máximo (100k)">
+                    </div>
+                    <div class="col-lg-4 col-md-6 col-sm-12 d-flex align-items-center">
+                        <div class="filter-actions w-100">
+                            <button id="apply-filters" class="btn btn-primary flex-fill">
+                                <i class="bi bi-search"></i> Filtrar
+                            </button>
+                            <button id="clear-filters" class="btn btn-warning flex-fill">
+                                <i class="bi bi-arrow-clockwise"></i> Limpar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table id="imoveis-baratos-table" class="table table-dark table-striped" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th><i class="bi bi-map"></i> UF</th>
+                                <th><i class="bi bi-geo-alt"></i> Cidade</th>
+                                <th><i class="bi bi-buildings"></i> Bairro</th>
+                                <th><i class="bi bi-signpost"></i> Endereço</th>
+                                <th><i class="bi bi-bookmark"></i> Status</th>
+                                <th><i class="bi bi-currency-dollar"></i> Preço</th>
+                                <th><i class="bi bi-calculator"></i> Avaliação</th>
+                                <th><i class="bi bi-percent"></i> Desconto</th>
+                                <th><i class="bi bi-rulers"></i> Área Privativa</th>
+                                <th><i class="bi bi-map-fill"></i> Área Terreno</th>
+                                <th><i class="bi bi-calculator-fill"></i> R$/m²</th>
+                                <th><i class="bi bi-building"></i> Tipologia</th>
+                                <th><i class="bi bi-tag"></i> Modalidade</th>
+                                <th><i class="bi bi-calendar"></i> Data Disputa</th>
+                                <th><i class="bi bi-credit-card"></i> FGTS</th>
+                                <th><i class="bi bi-bank"></i> Financiamento</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            const formatCurrency = (value) => {
+                if (!value || value === 0 || value === '0.00') return 'R$ 0,00';
+                const num = parseFloat(value);
+                if (isNaN(num)) return 'N/A';
+                return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            };
+
+            const formatArea = (value) => {
+                if (!value || value === 'N/A' || value === 'null') return 'N/A';
+                if (typeof value === 'string' && value.includes('m²')) return value;
+                const num = parseFloat(value);
+                if (isNaN(num)) return 'N/A';
+                return `${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²`;
+            };
+
+            const calculatePricePerM2 = (preco, areaPrivativa, areaTerreno) => {
+                const price = parseFloat(preco);
+                if (isNaN(price) || price <= 0) return 'N/A';
+                let area = 0;
+                if (areaPrivativa && areaPrivativa !== 'N/A' && areaPrivativa !== 'null') {
+                    const areaPrivNum = parseFloat(areaPrivativa.toString().replace(/[^\d.,]/g, '').replace(',', '.'));
+                    if (!isNaN(areaPrivNum) && areaPrivNum > 0) area = areaPrivNum;
+                }
+                if (area === 0 && areaTerreno && areaTerreno !== 'N/A' && areaTerreno !== 'null') {
+                    const areaTerNum = parseFloat(areaTerreno.toString().replace(/[^\d.,]/g, '').replace(',', '.'));
+                    if (!isNaN(areaTerNum) && areaTerNum > 0) area = areaTerNum;
+                }
+                if (area <= 0) return 'N/A';
+                const pricePerM2 = price / area;
+                return `R$ ${pricePerM2.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            };
+
+            const formatStatus = (status) => {
+                if (!status) status = 'Existente';
+                const statusClass = status.toLowerCase();
+                return `<span class="badge status-${statusClass}" style="padding: 0.3rem 0.8rem; border-radius: 15px; font-size: 0.8rem; font-weight: 600;">${status}</span>`;
+            };
+            
+            const table = $('#imoveis-baratos-table').DataTable({
+                processing: true,
+                serverSide: false,
+                ajax: {
+                    url: '/api/imoveis_baratos', 
+                    dataSrc: ''
+                },
+                columns: [
+                    { data: 'UF', defaultContent: 'N/A' },
+                    { data: 'CIDADE', defaultContent: 'N/A' },
+                    { data: 'BAIRRO', defaultContent: 'N/A' },
+                    { data: 'ENDERECO', defaultContent: 'N/A' },
+                    { 
+                        data: 'Status', 
+                        defaultContent: 'Existente',
+                        render: (data) => formatStatus(data)
+                    },
+                    { 
+                        data: 'PRECO', 
+                        defaultContent: '0',
+                        render: (data) => `<span class="price-column">${formatCurrency(data)}</span>`
+                    },
+                    { 
+                        data: 'AVALIACAO', 
+                        defaultContent: '0',
+                        render: (data) => `<span class="price-column">${formatCurrency(data)}</span>`
+                    },
+                    { 
+                        data: 'DESCONTO', 
+                        defaultContent: '0%',
+                        render: (data) => `<span class="discount-column">${data || '0%'}</span>`
+                    },
+                    { 
+                        data: 'AREA_PRIVATIVA', 
+                        defaultContent: 'N/A',
+                        render: (data) => `<span class="area-column">${formatArea(data)}</span>`
+                    },
+                    { 
+                        data: 'AREA_DO_TERRENO', 
+                        defaultContent: 'N/A',
+                        render: (data) => `<span class="area-column">${formatArea(data)}</span>`
+                    },
+                    { 
+                        data: null,
+                        defaultContent: 'N/A',
+                        render: (data, type, row) => `<span class="preco-m2-column">${calculatePricePerM2(row.PRECO, row.AREA_PRIVATIVA, row.AREA_DO_TERRENO)}</span>`
+                    },
+                    { 
+                        data: 'TIPO', 
+                        defaultContent: 'N/A',
+                        render: (data) => `<span class="tipo-column">${data || 'N/A'}</span>`
+                    },
+                    { data: 'MODALIDADE', defaultContent: 'N/A' },
+                    { data: 'DATA_DISPUTA', defaultContent: 'N/A' },
+                    { 
+                        data: 'FGTS', 
+                        defaultContent: 'NÃO',
+                        render: function(data) {
+                            const isFgts = data === 'SIM';
+                            return `<span class="badge ${isFgts ? 'bg-success' : 'bg-secondary'}">${isFgts ? 'Sim' : 'Não'}</span>`;
+                        }
+                    },
+                    { 
+                        data: 'FINANCIAMENTO', 
+                        defaultContent: 'NÃO',
+                        render: function(data) {
+                            const isFinanciamento = data === 'SIM';
+                            return `<span class="badge ${isFinanciamento ? 'bg-success' : 'bg-secondary'}">${isFinanciamento ? 'Sim' : 'Não'}</span>`;
+                        }
+                    }
+                ],
+                createdRow: function(row, data, dataIndex) { 
+                    $(row).on('click', function() { 
+                        if (data.LINK) { window.open(data.LINK, '_blank'); } 
+                    }); 
+                },
+                language: { url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json' },
+                order: [[5, 'asc']], 
+                pageLength: 25,
+                scrollX: true
+            });
+
+            function populateFilters() {
+                $.get('/api/filters', function(data) {
+                    ['ufs', 'tipos', 'modalidades'].forEach(key => {
+                        const selectId = `#${key.slice(0, -1)}-filter`;
+                        const select = $(selectId);
+                        const placeholder = select.find('option:first').text();
+                        select.html(`<option value="">${placeholder}</option>`);
+                        (data[key] || []).forEach(item => {
+                            select.append(`<option value="${item}">${item}</option>`);
+                        });
+                    });
+                });
+            }
+
+            $('#uf-filter').on('change', function() {
+                const selectedUf = $(this).val();
+                $('#cidade-filter').html('<option value="">Todas as Cidades</option>');
+                $('#bairro-filter').html('<option value="">Todos os Bairros</option>');
+                if (selectedUf) {
+                    $.get('/api/cidades_por_uf', { uf: selectedUf }, function(cidades) {
+                        cidades.forEach(cidade => $('#cidade-filter').append(`<option value="${cidade}">${cidade}</option>`));
+                    });
+                }
+            });
+
+            $('#cidade-filter').on('change', function() {
+                const selectedUf = $('#uf-filter').val();
+                const selectedCidade = $(this).val();
+                $('#bairro-filter').html('<option value="">Todos os Bairros</option>');
+                if (selectedCidade) {
+                    $.get('/api/bairros_por_cidade', { cidade: selectedCidade, uf: selectedUf }, function(bairros) {
+                        bairros.forEach(bairro => $('#bairro-filter').append(`<option value="${bairro}">${bairro}</option>`));
+                    });
+                }
+            });
+
+            function applyClientSideFilters() {
+                let data = table.rows({ search: 'applied' }).data().toArray(); 
+                
+                const filters = {
+                    UF: $('#uf-filter').val(),
+                    CIDADE: $('#cidade-filter').val(),
+                    BAIRRO: $('#bairro-filter').val(),
+                    TIPO: $('#tipo-filter').val(),
+                    MODALIDADE: $('#modalidade-filter').val(),
+                    FGTS: $('#fgts-filter').val(),
+                    FINANCIAMENTO: $('#financiamento-filter').val(),
+                    preco_min: parseFloat($('#preco-min-filter').val()) || 0,
+                    preco_max: parseFloat($('#preco-max-filter').val()) || 100000,
+                    status: $('#status-filter').val()
+                };
+
+                table.clear();
+
+                const filteredData = data.filter(item => {
+                    let passes = true;
+                    ['UF', 'CIDADE', 'BAIRRO', 'TIPO', 'MODALIDADE', 'FGTS', 'FINANCIAMENTO'].forEach(key => {
+                        if (filters[key] && item[key] !== filters[key]) {
+                            passes = false;
+                        }
+                    });
+
+                    if (filters.status && filters.status !== "Todos") {
+                        if (filters.status === "Ativos" && !['Novo', 'Existente', 'Atualizado'].includes(item.Status)) passes = false;
+                        else if (filters.status === "Apenas Novos" && item.Status !== 'Novo') passes = false;
+                        else if (filters.status === "Expirado" && item.Status !== 'Expirado') passes = false;
+                    }
+
+                    const preco = parseFloat(item.PRECO);
+                    if (preco < filters.preco_min || preco > filters.preco_max) {
+                        passes = false;
+                    }
+                    
+                    return passes;
+                });
+                
+                table.rows.add(filteredData).draw();
+            }
+
+            $('#clear-filters').on('click', function() {
+                $('select, input').val('');
+                $('#status-filter').val('Ativos');
+                table.ajax.reload();
+            });
+
+            $('#apply-filters').on('click', function() {
+                table.ajax.reload(applyClientSideFilters);
+            });
+
+            populateFilters();
+        });
+    </script>
+</body>
+</html>

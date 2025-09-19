@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comparação de Imóveis</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.5/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+        
+        :root {
+            --primary-color: #8e44ad;
+            --secondary-color: #3498db;
+            --background-start: #1a1a2e;
+            --background-end: #16213e;
+            --card-bg: #1f2847;
+            --text-color: #e0e0e0;
+            --border-color: #2c3e50;
+            --font-family: 'Poppins', sans-serif;
+            --bairro-highlight-color: #ccff00;
+            --glass-bg: rgba(31, 40, 71, 0.8);
+            --orange-color: #f39c12;
+        }
+        
+        body {
+            background: linear-gradient(-45deg, var(--background-start), var(--background-end), #0f3460, #1a1a2e);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            color: var(--text-color);
+            font-family: var(--font-family);
+            min-height: 100vh;
+        }
+        
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        h1 {
+            color: var(--secondary-color);
+            font-weight: 700;
+            text-shadow: 0 0 20px rgba(52, 152, 219, 0.3);
+            margin-bottom: 2rem;
+        }
+        
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-bottom: 2rem;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+        }
+        
+        .card-header {
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1.5rem;
+            border-top-left-radius: 15px;
+            border-top-right-radius: 15px;
+        }
+        
+        .card-body {
+            padding: 1.5rem;
+        }
+        
+        .filter-section {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .form-select, .form-control {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            color: var(--text-color);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+        }
+        
+        .form-select:focus, .form-control:focus {
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .form-select option {
+            background: var(--card-bg);
+            color: var(--text-color);
+        }
+        
+        .table-responsive {
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .table {
+            --bs-table-bg: transparent;
+            --bs-table-striped-bg: rgba(255, 255, 255, 0.05);
+            --bs-table-hover-bg: rgba(52, 152, 219, 0.2);
+            color: var(--text-color);
+            border: none;
+            margin-bottom: 0;
+        }
+        
+        .table thead {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        }
+        
+        .table th, .table td {
+            border-color: rgba(255, 255, 255, 0.1);
+            vertical-align: middle;
+            padding: 1rem;
+            color: var(--text-color);
+        }
+        
+        .table th {
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+        }
+        
+        .table tbody tr {
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        
+        .table tbody tr:hover {
+            transform: scale(1.01);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn {
+            border-radius: 25px;
+            padding: 10px 25px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+        }
+        
+        .btn-outline-secondary {
+            color: var(--text-color);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: transparent;
+        }
+        
+        .btn-outline-secondary:hover {
+            background: var(--secondary-color);
+            border-color: var(--secondary-color);
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), #9b59b6);
+            box-shadow: 0 4px 15px rgba(142, 68, 173, 0.3);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(142, 68, 173, 0.5);
+        }
+        
+        .btn-warning {
+            background: linear-gradient(135deg, var(--orange-color), #e67e22);
+            color: white;
+            box-shadow: 0 4px 15px rgba(243, 156, 18, 0.3);
+        }
+        
+        .btn-warning:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(243, 156, 18, 0.5);
+            color: white;
+        }
+        
+        .uf-header {
+            color: var(--primary-color);
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            padding-left: 1rem;
+            border-left: 4px solid var(--primary-color);
+            text-shadow: 0 0 15px rgba(142, 68, 173, 0.3);
+        }
+        
+        .cidade-header {
+            color: var(--orange-color);
+            font-size: 1.6rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            padding-left: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .bairro-header {
+            color: var(--bairro-highlight-color);
+            font-size: 1.2rem;
+            font-weight: 600;
+            background: rgba(204, 255, 0, 0.1);
+            padding: 0.8rem 1.2rem;
+            border-radius: 10px;
+            border-left: 4px solid var(--bairro-highlight-color);
+            text-shadow: 0 0 10px rgba(204, 255, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .property-count {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            color: white;
+        }
+        
+        .group-container {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2.5rem;
+            background: rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(5px);
+        }
+        
+        .price-column {
+            color: #2ecc71;
+            font-weight: 600;
+        }
+        
+        .discount-column {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+        
+        .area-column {
+            color: #3498db;
+        }
+        
+        .preco-m2-column {
+            color: var(--orange-color);
+            font-weight: 600;
+        }
+        
+        .tipo-column {
+            color: #9b59b6;
+            font-weight: 500;
+        }
+        
+        .status-novo {
+            background: rgba(46, 204, 113, 0.2);
+            color: #2ecc71;
+            border: 1px solid #2ecc71;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .status-existente {
+            background: rgba(52, 152, 219, 0.2);
+            color: #3498db;
+            border: 1px solid #3498db;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        /* --- ESTILO ADICIONADO AQUI --- */
+        .status-atualizado {
+            background: rgba(204, 255, 0, 0.2);
+            color: #ccff00;
+            border: 1px solid #ccff00;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .status-expirado {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+            border: 1px solid #e74c3c;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .no-data-message {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-color);
+            background: var(--glass-bg);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .no-data-message i {
+            font-size: 3rem;
+            color: var(--secondary-color);
+            margin-bottom: 1rem;
+        }
+        
+        .stats-row {
+            display: flex;
+            justify-content: space-around;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--secondary-color);
+        }
+        
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-color);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .filter-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .filter-actions {
+                flex-direction: column;
+            }
+        }
+        
+        .loading-message {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-color);
+        }
+        
+        .loading-message i {
+            font-size: 3rem;
+            color: var(--secondary-color);
+            margin-bottom: 1rem;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4 px-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="bi bi-diagram-3"></i> Comparação de Imóveis</h1>
+            <div class="d-flex gap-2">
+                <a href="/" class="btn btn-outline-secondary">
+                    <i class="bi bi-house-door"></i> Dashboard
+                </a>
+                <a href="/imoveis_baratos" class="btn btn-outline-secondary">
+                    <i class="bi bi-gem"></i> Oportunidades
+                </a>
+            </div>
+        </div>
+
+        <div class="filter-section">
+            <h5 class="mb-3"><i class="bi bi-funnel"></i> Filtros de Comparação</h5>
+            <div class="row g-3">
+                <div class="col-lg-2 col-md-3 col-sm-6">
+                    <label class="form-label">Estado</label>
+                    <select id="uf-filter" class="form-select">
+                        <option value="">Todos os Estados</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-3 col-sm-6">
+                    <label class="form-label">Cidade</label>
+                    <select id="cidade-filter" class="form-select">
+                        <option value="">Todas as Cidades</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-3 col-sm-6">
+                    <label class="form-label">Bairro</label>
+                    <select id="bairro-filter" class="form-select">
+                        <option value="">Todos os Bairros</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-3 col-sm-6">
+                    <label class="form-label">Tipologia</label>
+                    <select id="tipo-filter" class="form-select">
+                        <option value="">Todas as Tipologias</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-3 col-sm-6">
+                    <label class="form-label">Modalidade</label>
+                    <select id="modalidade-filter" class="form-select">
+                        <option value="">Todas as Modalidades</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-3 col-sm-6">
+                    <label class="form-label">Status</label>
+                    <select id="status-filter" class="form-select">
+                        <option value="Ativos" selected>Ativos</option>
+                        <option value="Apenas Novos">Apenas Novos</option>
+                        <option value="Expirado">Expirado</option>
+                        <option value="Todos">Todos</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-3 col-sm-6">
+                    <label class="form-label">Preço Mínimo</label>
+                    <input type="number" id="preco-min-filter" class="form-control" placeholder="R$ 0">
+                </div>
+                <div class="col-lg-2 col-md-3 col-sm-6">
+                    <label class="form-label">Preço Máximo</label>
+                    <input type="number" id="preco-max-filter" class="form-control" placeholder="R$ 1.000.000">
+                </div>
+                <div class="col-lg-4 col-md-6 col-sm-12 d-flex align-items-end">
+                    <div class="filter-actions w-100">
+                        <button id="apply-filters" class="btn btn-primary flex-fill">
+                            <i class="bi bi-search"></i> Filtrar
+                        </button>
+                        <button id="clear-filters" class="btn btn-warning flex-fill">
+                            <i class="bi bi-arrow-clockwise"></i> Limpar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="comparison-results">
+            <div class="loading-message">
+                <i class="bi bi-arrow-repeat"></i>
+                <h3>Carregando dados de comparação...</h3>
+                <p>Aguarde enquanto organizamos os imóveis por localização.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            let allData = [];
+            
+            const formatCurrency = (value) => {
+                if (!value || value === 0 || value === '0.00') return 'R$ 0,00';
+                const num = parseFloat(value);
+                if (isNaN(num)) return 'R$ 0,00';
+                return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            };
+
+            const formatArea = (value) => {
+                if (!value || value === 'N/A' || value === 'null' || value === null) return 'N/A';
+                if (typeof value === 'string' && value.includes('m²')) return value;
+                const num = parseFloat(value);
+                if (isNaN(num)) return 'N/A';
+                return `${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²`;
+            };
+
+            const calculatePricePerM2 = (preco, areaPrivativa, areaTerreno) => {
+                const price = parseFloat(preco);
+                if (isNaN(price) || price <= 0) return 'N/A';
+
+                let area = 0;
+                
+                if (areaPrivativa && areaPrivativa !== 'N/A' && areaPrivativa !== 'null' && areaPrivativa !== null) {
+                    const areaPrivNum = parseFloat(areaPrivativa.toString().replace(/[^\d.,]/g, '').replace(',', '.'));
+                    if (!isNaN(areaPrivNum) && areaPrivNum > 0) {
+                        area = areaPrivNum;
+                    }
+                }
+
+                if (area === 0 && areaTerreno && areaTerreno !== 'N/A' && areaTerreno !== 'null' && areaTerreno !== null) {
+                    const areaTerNum = parseFloat(areaTerreno.toString().replace(/[^\d.,]/g, '').replace(',', '.'));
+                    if (!isNaN(areaTerNum) && areaTerNum > 0) {
+                        area = areaTerNum;
+                    }
+                }
+
+                if (area <= 0) return 'N/A';
+
+                const pricePerM2 = price / area;
+                return `R$ ${pricePerM2.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            };
+
+            const formatStatus = (status) => {
+                if (!status) status = 'Existente';
+                const statusClass = status.toLowerCase().replace(/\s+/g, '');
+                return `<span class="badge status-${statusClass}">${status}</span>`;
+            };
+
+            const groupData = (data) => {
+                const grouped = {};
+                
+                data.forEach(imovel => {
+                    const uf = imovel.UF || 'N/A';
+                    const cidade = imovel.CIDADE || 'N/A';
+                    const bairro = imovel.BAIRRO || 'N/A';
+                    
+                    if (!grouped[uf]) grouped[uf] = {};
+                    if (!grouped[uf][cidade]) grouped[uf][cidade] = {};
+                    if (!grouped[uf][cidade][bairro]) grouped[uf][cidade][bairro] = [];
+                    
+                    grouped[uf][cidade][bairro].push(imovel);
+                });
+                
+                return grouped;
+            };
+
+            const renderData = (grouped) => {
+                if (Object.keys(grouped).length === 0) {
+                    return `
+                        <div class="no-data-message">
+                            <i class="bi bi-search"></i>
+                            <h3>Nenhum resultado encontrado</h3>
+                            <p>Tente ajustar os filtros para encontrar imóveis que atendam aos critérios.</p>
+                        </div>
+                    `;
+                }
+
+                let html = '';
+                
+                Object.keys(grouped).forEach(uf => {
+                    html += `<div class="mb-5">
+                        <h2 class="uf-header">${uf}</h2>`;
+                    
+                    Object.keys(grouped[uf]).forEach(cidade => {
+                        const bairros = grouped[uf][cidade];
+                        
+                        // Filtra apenas bairros com 2 ou mais imóveis para comparação
+                        const bairrosComparaveis = Object.keys(bairros).filter(bairro => bairros[bairro].length >= 2);
+                        
+                        if (bairrosComparaveis.length > 0) {
+                            const cidadeTotal = bairrosComparaveis.reduce((sum, bairro) => sum + bairros[bairro].length, 0);
+                            const precos = bairrosComparaveis.flatMap(bairro => bairros[bairro])
+                                .map(i => parseFloat(i.PRECO))
+                                .filter(p => !isNaN(p) && p > 0);
+                            const precoMedio = precos.length > 0 ? precos.reduce((a, b) => a + b, 0) / precos.length : 0;
+                            
+                            html += `<div class="group-container">
+                                <h3 class="cidade-header">
+                                    <i class="bi bi-geo-alt"></i> ${cidade}
+                                </h3>
+                                <div class="stats-row">
+                                    <div class="stat-item">
+                                        <div class="stat-value">${cidadeTotal}</div>
+                                        <div class="stat-label">Imóveis Comparáveis</div>
+                                    </div>
+                                    <div class="stat-item">
+                                        <div class="stat-value">${bairrosComparaveis.length}</div>
+                                        <div class="stat-label">Bairros c/ Múltiplos</div>
+                                    </div>
+                                    <div class="stat-item">
+                                        <div class="stat-value">${formatCurrency(precoMedio)}</div>
+                                        <div class="stat-label">Preço Médio</div>
+                                    </div>
+                                </div>`;
+                            
+                            bairrosComparaveis.forEach(bairro => {
+                                const imoveis = bairros[bairro];
+                                
+                                // Ordena os imóveis por endereço em ordem alfabética
+                                imoveis.sort((a, b) => {
+                                    const enderecoA = (a.ENDERECO || 'N/A').toLowerCase();
+                                    const enderecoB = (b.ENDERECO || 'N/A').toLowerCase();
+                                    return enderecoA.localeCompare(enderecoB);
+                                });
+                                
+                                html += `<div class="card mb-4">
+                                    <div class="card-header">
+                                        <h4 class="bairro-header mb-0">
+                                            <span><i class="bi bi-buildings"></i> Bairro: ${bairro}</span>
+                                            <span class="property-count">${imoveis.length} Imóveis</span>
+                                        </h4>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-striped table-hover">
+                                                <thead>
+                                                    <tr>
+                                                        <th><i class="bi bi-house"></i> Endereço</th>
+                                                        <th><i class="bi bi-currency-dollar"></i> Preço</th>
+                                                        <th><i class="bi bi-calculator"></i> Avaliação</th>
+                                                        <th><i class="bi bi-percent"></i> Desconto</th>
+                                                        <th><i class="bi bi-rulers"></i> Área Privativa</th>
+                                                        <th><i class="bi bi-map"></i> Área Terreno</th>
+                                                        <th><i class="bi bi-calculator-fill"></i> R$/m²</th>
+                                                        <th><i class="bi bi-tag"></i> Modalidade</th>
+                                                        <th><i class="bi bi-bookmark"></i> Status</th>
+                                                        <th><i class="bi bi-building"></i> Tipologia</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>`;
+                                
+                                imoveis.forEach(imovel => {
+                                    const precoM2 = calculatePricePerM2(imovel.PRECO, imovel.AREA_PRIVATIVA, imovel.AREA_DO_TERRENO);
+                                    
+                                    html += `<tr data-link="${imovel.LINK}" class="property-row" style="cursor: pointer;">
+                                        <td>${imovel.ENDERECO || 'N/A'}</td>
+                                        <td class="price-column">${formatCurrency(imovel.PRECO)}</td>
+                                        <td class="price-column">${formatCurrency(imovel.AVALIACAO)}</td>
+                                        <td class="discount-column">${imovel.DESCONTO || '0%'}</td>
+                                        <td class="area-column">${formatArea(imovel.AREA_PRIVATIVA)}</td>
+                                        <td class="area-column">${formatArea(imovel.AREA_DO_TERRENO)}</td>
+                                        <td class="preco-m2-column">${precoM2}</td>
+                                        <td>${imovel.MODALIDADE || 'N/A'}</td>
+                                        <td>${formatStatus(imovel.Status)}</td>
+                                        <td class="tipo-column">${imovel.TIPO || 'N/A'}</td>
+                                    </tr>`;
+                                });
+                                
+                                html += `</tbody></table></div></div></div>`;
+                            });
+                            
+                            html += `</div>`;
+                        }
+                    });
+                    
+                    html += `</div>`;
+                });
+
+                return html;
+            };
+
+            const loadInitialData = () => {
+                $.get('/api/data', { status: 'Ativos' })
+                    .done(function(data) {
+                        allData = data;
+                        if (data.length === 0) {
+                            $('#comparison-results').html(`
+                                <div class="no-data-message">
+                                    <i class="bi bi-house-x"></i>
+                                    <h3>Nenhum imóvel para comparação encontrado</h3>
+                                    <p>Inicie uma raspagem no Dashboard para popular os dados ou ajuste os filtros acima.</p>
+                                    <a href="/" class="btn btn-primary mt-3">
+                                        <i class="bi bi-arrow-left"></i> Voltar ao Dashboard
+                                    </a>
+                                </div>
+                            `);
+                        } else {
+                            const grouped = groupData(data);
+                            const html = renderData(grouped);
+                            $('#comparison-results').html(html);
+                            
+                            $('.property-row').on('click', function() {
+                                const link = $(this).data('link');
+                                if (link) {
+                                    window.open(link, '_blank');
+                                }
+                            });
+                        }
+                    })
+                    .fail(function() {
+                        $('#comparison-results').html(`
+                            <div class="no-data-message">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <h3>Erro ao carregar dados</h3>
+                                <p>Não foi possível carregar os dados dos imóveis. Verifique a conexão.</p>
+                            </div>
+                        `);
+                    });
+            };
+
+            const loadFilters = () => {
+                $.get('/api/filters', function(data) {
+                    const ufSelect = $('#uf-filter');
+                    ufSelect.html('<option value="">Todos os Estados</option>');
+                    (data.ufs || []).forEach(uf => {
+                        ufSelect.append(`<option value="${uf}">${uf}</option>`);
+                    });
+
+                    const tipoSelect = $('#tipo-filter');
+                    tipoSelect.html('<option value="">Todas as Tipologias</option>');
+                    (data.tipos || []).forEach(tipo => {
+                        tipoSelect.append(`<option value="${tipo}">${tipo}</option>`);
+                    });
+
+                    const modalidadeSelect = $('#modalidade-filter');
+                    modalidadeSelect.html('<option value="">Todas as Modalidades</option>');
+                    (data.modalidades || []).forEach(modalidade => {
+                        modalidadeSelect.append(`<option value="${modalidade}">${modalidade}</option>`);
+                    });
+                });
+            };
+
+            $('#uf-filter').on('change', function() {
+                const selectedUf = $(this).val();
+                $('#cidade-filter').html('<option value="">Todas as Cidades</option>');
+                $('#bairro-filter').html('<option value="">Todos os Bairros</option>');
+                
+                if (selectedUf) {
+                    $.get('/api/cidades_por_uf', { uf: selectedUf }, function(cidades) {
+                        cidades.forEach(cidade => {
+                            $('#cidade-filter').append(`<option value="${cidade}">${cidade}</option>`);
+                        });
+                    });
+                }
+            });
+
+            $('#cidade-filter').on('change', function() {
+                const selectedCidade = $(this).val();
+                const selectedUf = $('#uf-filter').val();
+                $('#bairro-filter').html('<option value="">Todos os Bairros</option>');
+                
+                if (selectedCidade) {
+                    $.get('/api/bairros_por_cidade', { cidade: selectedCidade, uf: selectedUf }, function(bairros) {
+                        bairros.forEach(bairro => {
+                            $('#bairro-filter').append(`<option value="${bairro}">${bairro}</option>`);
+                        });
+                    });
+                }
+            });
+
+            $('#clear-filters').on('click', function() {
+                $('#uf-filter').val('');
+                $('#cidade-filter').html('<option value="">Todas as Cidades</option>');
+                $('#bairro-filter').html('<option value="">Todos os Bairros</option>');
+                $('#tipo-filter').val('');
+                $('#modalidade-filter').val('');
+                $('#status-filter').val('Ativos');
+                $('#preco-min-filter').val('');
+                $('#preco-max-filter').val('');
+                
+                loadInitialData();
+            });
+
+            $('#apply-filters').on('click', function() {
+                const filters = {
+                    uf: $('#uf-filter').val(),
+                    cidade: $('#cidade-filter').val(),
+                    bairro: $('#bairro-filter').val(),
+                    tipo: $('#tipo-filter').val(),
+                    modalidade: $('#modalidade-filter').val(),
+                    status: $('#status-filter').val(),
+                    preco_min: $('#preco-min-filter').val(),
+                    preco_max: $('#preco-max-filter').val()
+                };
+
+                $('#comparison-results').html(`
+                    <div class="loading-message">
+                        <i class="bi bi-arrow-repeat"></i>
+                        <h3>Aplicando filtros...</h3>
+                        <p>Organizando resultados por localização.</p>
+                    </div>
+                `);
+
+                $.get('/api/data', filters)
+                    .done(function(data) {
+                        const grouped = groupData(data);
+                        const html = renderData(grouped);
+                        $('#comparison-results').html(html);
+                        
+                        $('.property-row').on('click', function() {
+                            const link = $(this).data('link');
+                            if (link) {
+                                window.open(link, '_blank');
+                            }
+                        });
+                    })
+                    .fail(function() {
+                        $('#comparison-results').html(`
+                            <div class="no-data-message">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <h3>Erro ao aplicar filtros</h3>
+                                <p>Não foi possível filtrar os dados. Tente novamente.</p>
+                            </div>
+                        `);
+                    });
+            });
+
+            loadFilters();
+            loadInitialData();
+        });
+    </script>
+</body>
+</html>
