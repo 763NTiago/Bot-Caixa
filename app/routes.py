@@ -21,11 +21,10 @@ def dashboard():
 def api_data():
     try:
         query = db.session.query(Imovel, Atualizacao.ChangedFields).outerjoin(
-            Atualizacao, Imovel.MATRICULA == Atualizacao.MATRICULA
+            Atualizacao, 
+            db.and_(Imovel.UF == Atualizacao.UF, Imovel.MATRICULA == Atualizacao.MATRICULA)
         )
-        
         status_filter = request.args.get('status', '').strip()
-        
         if status_filter == 'Ativos':
             query = query.filter(Imovel.Status.in_(['Novo', 'Existente', 'Atualizado']))
         elif status_filter == 'Apenas Novos':
@@ -34,7 +33,6 @@ def api_data():
             query = query.filter(Imovel.Status == 'Atualizado')
         elif status_filter == 'Expirado':
             query = query.filter(Imovel.Status == 'Expirado')
-
         filtros = {
             'uf': 'UF',
             'cidade': 'CIDADE', 
@@ -44,12 +42,10 @@ def api_data():
             'fgts': 'FGTS',
             'financiamento': 'FINANCIAMENTO'
         }
-        
         for param, column in filtros.items():
             valor = request.args.get(param, '').strip()
             if valor:
                 query = query.filter(getattr(Imovel, column) == valor)
-        
         try:
             preco_min = request.args.get('preco_min')
             if preco_min:
@@ -57,7 +53,6 @@ def api_data():
                 query = query.filter(Imovel.PRECO >= preco_min)
         except (ValueError, TypeError):
             pass
-            
         try:
             preco_max = request.args.get('preco_max')
             if preco_max:
@@ -65,25 +60,19 @@ def api_data():
                 query = query.filter(Imovel.PRECO <= preco_max)
         except (ValueError, TypeError):
             pass
-        
         data_inicio = request.args.get('data_inicio', '').strip()
         data_fim = request.args.get('data_fim', '').strip()
-        
         if data_inicio:
             query = query.filter(Imovel.DATA_DISPUTA >= data_inicio)
         if data_fim:
             query = query.filter(Imovel.DATA_DISPUTA <= data_fim)
-        
         results = query.order_by(Imovel.PRECO.asc()).all()
-        
         imoveis_list = []
         for imovel, changed_fields in results:
             imovel_dict = imovel.to_dict()
             imovel_dict['ChangedFields'] = changed_fields or ""
             imoveis_list.append(imovel_dict)
-            
         return jsonify(imoveis_list)
-        
     except Exception as e:
         logging.error(f"Erro na API de dados: {e}", exc_info=True)
         return jsonify([])
@@ -113,24 +102,19 @@ def api_summary():
 def api_filters():
     try:
         filters_data = datalogic.get_filter_options()
-        
         filters_data['bairros'] = [
             r[0] for r in db.session.query(Imovel.BAIRRO).distinct().order_by(Imovel.BAIRRO).all() 
             if r[0]
         ]
-        
         preco_stats = db.session.query(
             func.min(Imovel.PRECO), 
             func.max(Imovel.PRECO)
         ).filter(Imovel.PRECO > 0).first()
-        
         filters_data['preco_range'] = {
             'min': float(preco_stats[0] or 0),
             'max': float(preco_stats[1] or 1000000)
         }
-        
         return jsonify(filters_data)
-        
     except Exception as e:
         logging.error(f"Erro ao obter filtros: {e}", exc_info=True)
         return jsonify({
@@ -164,7 +148,6 @@ def api_cidades_por_uf():
         uf = request.args.get('uf', '').strip()
         if not uf:
             return jsonify([])
-            
         cidades = [
             r[0] for r in db.session.query(Imovel.CIDADE)
             .filter(Imovel.UF == uf)
@@ -173,7 +156,6 @@ def api_cidades_por_uf():
             if r[0]
         ]
         return jsonify(cidades)
-        
     except Exception as e:
         logging.error(f"Erro ao obter cidades: {e}", exc_info=True)
         return jsonify([])
@@ -182,18 +164,14 @@ def api_cidades_por_uf():
 def api_bairros_por_cidade():
     try:
         query = db.session.query(Imovel.BAIRRO).distinct()
-        
         cidade = request.args.get('cidade', '').strip()
         if cidade:
             query = query.filter(Imovel.CIDADE == cidade)
-            
         uf = request.args.get('uf', '').strip()
         if uf:
             query = query.filter(Imovel.UF == uf)
-        
         bairros = [r[0] for r in query.order_by(Imovel.BAIRRO).all() if r[0]]
         return jsonify(bairros)
-        
     except Exception as e:
         logging.error(f"Erro ao obter bairros: {e}", exc_info=True)
         return jsonify([])
@@ -219,31 +197,39 @@ def processar():
             f"data: {json.dumps({'type': 'error', 'message': 'Nenhum estado selecionado.'})}\n\n", 
             mimetype='text/event-stream'
         )
-
     def generate_events():
+        import app.datalogic as datalogic
         try:
-            yield f"data: {json.dumps({'type': 'stage', 'message': 'Iniciando raspagem...'})}\n\n"
-            
+            yield f"data: {json.dumps({'type': 'start', 'message': 'Iniciando processamento...', 'current': 0, 'total': 100})}\n\n"
+            total_steps = len(estados) + 3
+            current_step = 0
+            yield f"data: {json.dumps({'type': 'stage', 'message': 'Baixando listas dos estados...', 'current': current_step, 'total': total_steps})}\n\n"
             for event in scraper.baixar_listas_por_estados(estados):
+                current_step += 1
+                event['current'] = current_step
+                event['total'] = total_steps
                 yield f"data: {json.dumps(event)}\n\n"
-            
+            current_step += 1
+            yield f"data: {json.dumps({'type': 'stage', 'message': 'Processando arquivos CSV...', 'current': current_step, 'total': total_steps})}\n\n"
             scraped_data = []
-            
-            for event in scraper.processar_arquivos():
+            for event in scraper.processar_arquivos_csv():
                 if event.get('type') == 'scraping_done':
                     scraped_data = event.get('data', [])
+                if 'current' not in event:
+                    event['current'] = current_step
+                    event['total'] = total_steps
                 yield f"data: {json.dumps(event)}\n\n"
-            
-            yield f"data: {json.dumps({'type': 'updating_status', 'message': 'Atualizando status dos imóveis...'})}\n\n"
+            current_step += 1
+            yield f"data: {json.dumps({'type': 'updating_status', 'message': 'Atualizando status dos imóveis...', 'current': current_step, 'total': total_steps})}\n\n"
             datalogic.process_scraped_data(scraped_data)
-            
-            yield f"data: {json.dumps({'type': 'done', 'message': 'Processo finalizado com sucesso!'})}\n\n"
-            
+            yield f"data: {json.dumps({'type': 'done', 'message': 'Processo finalizado com sucesso!', 'current': total_steps, 'total': total_steps})}\n\n"
         except Exception as e:
             logging.error(f"Erro no stream de processamento: {e}", exc_info=True)
-            yield f"data: {json.dumps({'type': 'error', 'message': f'Erro no processamento: {str(e)}'})}\n\n"
-            
-    return Response(generate_events(), mimetype='text/event-stream')
+            yield f"data: {json.dumps({'type': 'error', 'message': f'Erro no processamento: {str(e)}', 'current': 100, 'total': 100})}\n\n"
+    response = Response(generate_events(), mimetype='text/event-stream')
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['Connection'] = 'keep-alive'
+    return response
 
 @bp.route('/upload_excel', methods=['POST'])
 def upload_excel():
@@ -254,16 +240,13 @@ def upload_excel():
                 'success': False, 
                 'message': 'Nenhum arquivo selecionado.'
             }), 400
-
         temp_dir = 'temporarios'
         results = []
         os.makedirs(temp_dir, exist_ok=True)
-        
         for file in files:
             if file and file.filename.endswith(('.xlsx', '.xls')):
                 filename = secure_filename(file.filename)
                 file_path = os.path.join(temp_dir, filename)
-                
                 try:
                     file.save(file_path)
                     success, message = convert_excel_to_db(file_path)
@@ -272,30 +255,25 @@ def upload_excel():
                         'success': success, 
                         'message': message
                     })
-                    
                 except Exception as e:
                     results.append({
                         'file': file.filename, 
                         'success': False, 
                         'message': f'Erro ao processar arquivo: {str(e)}'
                     })
-                    
                 finally:
                     if os.path.exists(file_path):
                         try:
                             os.remove(file_path)
                         except OSError:
                             pass
-        
         success_count = sum(1 for r in results if r['success'])
         total_count = len(results)
-        
         return jsonify({
             'success': success_count == total_count,
             'message': f'Processados {success_count}/{total_count} arquivos com sucesso.',
             'results': results
         })
-    
     except Exception as e:
         logging.error(f"Erro no upload de Excel: {e}", exc_info=True)
         return jsonify({
@@ -308,42 +286,32 @@ def export_xlsx_hyperlink():
     try:
         estados_param = request.args.get('estados', '').strip()
         estados = []
-        
         if estados_param:
             estados = [uf.strip().upper() for uf in estados_param.split(',') if uf.strip()]
             logging.info(f"Exportando para estados: {estados}")
         else:
             logging.info("Exportando todos os estados")
-        
         df = datalogic.get_imoveis_for_export(estados)
-        
         if df.empty:
             logging.warning("Nenhum dado encontrado para exportação")
-        
         buffer = io.BytesIO()
-        
         formatar_planilha_excel(df, buffer)
         buffer.seek(0)
-        
         if estados:
             download_name = f'imoveis_{"_".join(estados[:3])}.xlsx'
             if len(estados) > 3:
                 download_name = f'imoveis_{len(estados)}_estados.xlsx'
         else:
             download_name = 'todos_imoveis.xlsx'
-        
         logging.info(f"Exportação concluída: {download_name}, {len(df)} registros")
-        
         return send_file(
             buffer,
             as_attachment=True,
             download_name=download_name,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-        
     except Exception as e:
         logging.error(f"Erro na exportação: {e}", exc_info=True)
-        
         return jsonify({
             'success': False,
             'message': f'Erro na exportação: {str(e)}'

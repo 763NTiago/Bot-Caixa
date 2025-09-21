@@ -3,9 +3,11 @@ from sqlalchemy.sql import func
 
 class Imovel(db.Model):
     __tablename__ = 'imoveis'
-    MATRICULA = db.Column(db.String, primary_key=True)
+    
+    UF = db.Column(db.String(2), primary_key=True)
+    MATRICULA = db.Column(db.String(50), primary_key=True) 
+    
     TIPO = db.Column(db.String)
-    UF = db.Column(db.String, index=True)
     CIDADE = db.Column(db.String)
     BAIRRO = db.Column(db.String)
     ENDERECO = db.Column(db.String)
@@ -42,9 +44,11 @@ class Imovel(db.Model):
 
 class Atualizacao(db.Model):
     __tablename__ = 'atualizacoes'
-    MATRICULA = db.Column(db.String, primary_key=True)
+    
+    UF = db.Column(db.String(2), primary_key=True)
+    MATRICULA = db.Column(db.String(50), primary_key=True)
+    
     TIPO = db.Column(db.String)
-    UF = db.Column(db.String)
     CIDADE = db.Column(db.String)
     PRECO = db.Column(db.Float)
     LINK = db.Column(db.String)
@@ -52,9 +56,4 @@ class Atualizacao(db.Model):
     ChangedFields = db.Column(db.String)
 
     def to_dict(self):
-        """Converte o objeto para dicionário."""
-        result = {}
-        for column in self.__table__.columns:
-            value = getattr(self, column.name)
-            result[column.name] = value if value is not None else ''
-        return result
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}

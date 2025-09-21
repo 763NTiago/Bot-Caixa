@@ -1,5 +1,7 @@
 import pandas as pd
 import os
+import re
+import unidecode
 from app import db
 from app.models import Imovel, Atualizacao
 import logging
@@ -26,8 +28,18 @@ def _clean_area(value):
     except (ValueError, TypeError):
         return None
 
+def _generate_address_initials(address):
+    """Gera as 3 primeiras iniciais do endereço em maiúsculas, ignorando acentos e símbolos."""
+    if not isinstance(address, str) or not address.strip():
+        return ''
+    normalized_address = unidecode.unidecode(address).upper()
+    cleaned_address = re.sub(r'[^A-Z\s]', '', normalized_address)
+    words = cleaned_address.split()
+    initials = [word[0] for word in words if word]
+    return "".join(initials[:3])
+
 def process_excel_file(file_path):
-    """Processa um arquivo Excel com a lógica de status detalhada."""
+    """Processa um arquivo Excel com uma chave única e previne duplicatas na mesma execução."""
     try:
         df = pd.read_excel(file_path)
         column_mapping = {
@@ -41,15 +53,29 @@ def process_excel_file(file_path):
         }
         df.rename(columns=column_mapping, inplace=True)
 
-        db.session.query(Atualizacao).delete()
-        db.session.commit()
+        ufs_no_arquivo = [str(uf).strip().upper() for uf in df['UF'].dropna().unique()]
+        if ufs_no_arquivo:
+            Atualizacao.query.filter(Atualizacao.UF.in_(ufs_no_arquivo)).delete(synchronize_session=False)
+            db.session.commit()
 
+        processed_ids = set() 
         processed_count = 0
+        
         for _, row in df.iterrows():
-            if pd.isna(row.get('MATRICULA')):
+            if pd.isna(row.get('MATRICULA')) or pd.isna(row.get('UF')) or pd.isna(row.get('ENDERECO')):
                 continue
 
-            matricula = str(row['MATRICULA'])
+            original_matricula = str(row['MATRICULA']).strip()
+            uf = str(row['UF']).strip().upper()
+            endereco = str(row['ENDERECO'])
+
+            address_initials = _generate_address_initials(endereco)
+            unique_matricula_id = f"{uf}{original_matricula}{address_initials}"
+            
+            if unique_matricula_id in processed_ids:
+                continue
+            processed_ids.add(unique_matricula_id)
+
             imovel_dict = {}
             for col in df.columns:
                 if col in Imovel.__table__.columns.keys() and pd.notna(row.get(col)):
@@ -59,8 +85,11 @@ def process_excel_file(file_path):
                         imovel_dict[col] = _clean_area(row[col])
                     else:
                         imovel_dict[col] = str(row[col]).strip()
+            
+            imovel_dict['MATRICULA'] = unique_matricula_id
+            imovel_dict['UF'] = uf
 
-            imovel_existente = db.session.get(Imovel, matricula)
+            imovel_existente = db.session.query(Imovel).filter_by(UF=uf, MATRICULA=unique_matricula_id).first()
 
             if not imovel_existente:
                 imovel_dict['Status'] = 'Novo'
@@ -68,19 +97,27 @@ def process_excel_file(file_path):
                 db.session.add(novo_imovel)
                 
                 atualizacao = Atualizacao(
-                    MATRICULA=matricula, Change='Novo', ChangedFields=",".join(imovel_dict.keys()))
+                    UF=uf,
+                    MATRICULA=unique_matricula_id,
+                    Change='Novo',
+                    ChangedFields=",".join([k for k in imovel_dict.keys() if k not in ['UF', 'MATRICULA']])
+                )
+                for field in ['TIPO', 'CIDADE', 'PRECO', 'LINK']:
+                    if field in imovel_dict:
+                        setattr(atualizacao, field, imovel_dict[field])
                 db.session.add(atualizacao)
                 processed_count += 1
             else:
                 changed_fields = []
                 for key, value in imovel_dict.items():
-                    current_value = getattr(imovel_existente, key)
-                    if key in ['AREA_PRIVATIVA', 'AREA_DO_TERRENO']:
-                        current_value = current_value if current_value is not None else None
-                        value = value if value is not None else None
-                    
-                    if str(current_value) != str(value):
-                        changed_fields.append(key)
+                    if key not in ['UF', 'MATRICULA']: 
+                        current_value = getattr(imovel_existente, key)
+                        if key in ['AREA_PRIVATIVA', 'AREA_DO_TERRENO']:
+                            current_value = current_value if current_value is not None else None
+                            value = value if value is not None else None
+                        
+                        if str(current_value) != str(value):
+                            changed_fields.append(key)
                 
                 if changed_fields:
                     for key in changed_fields:
@@ -88,8 +125,15 @@ def process_excel_file(file_path):
                     imovel_existente.Status = 'Atualizado'
                     
                     atualizacao = Atualizacao(
-                        MATRICULA=matricula, Change='Atualizado', ChangedFields=",".join(changed_fields))
-                    db.session.merge(atualizacao)
+                        UF=uf,
+                        MATRICULA=unique_matricula_id,
+                        Change='Atualizado',
+                        ChangedFields=",".join(changed_fields)
+                    )
+                    for field in ['TIPO', 'CIDADE', 'PRECO', 'LINK']:
+                        if field in imovel_dict:
+                            setattr(atualizacao, field, imovel_dict[field])
+                    db.session.add(atualizacao)
                     processed_count += 1
                 else:
                     if imovel_existente.Status == 'Novo':

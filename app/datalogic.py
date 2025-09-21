@@ -72,44 +72,43 @@ def process_scraped_data(data):
         if not ufs_processados:
             return
             
-        imoveis_db_dict = {
-            imovel.MATRICULA: imovel 
-            for imovel in Imovel.query.filter(Imovel.UF.in_(ufs_processados)).all()
-        }
+        imoveis_db_list = Imovel.query.filter(Imovel.UF.in_(ufs_processados)).all()
+        imoveis_db_dict = {(imovel.UF, imovel.MATRICULA): imovel for imovel in imoveis_db_list}
 
-        # Limpar registros de atualizações para os estados processados
         Atualizacao.query.filter(Atualizacao.UF.in_(ufs_processados)).delete(synchronize_session=False)
         db.session.commit()
+
+        chaves_processadas = set()
 
         for _, row in df_novos.iterrows():
             imovel_dict = row.to_dict()
             matricula = str(imovel_dict.get('MATRICULA'))
-            if not matricula:
+            uf = str(imovel_dict.get('UF'))
+            chave_composta = (uf, matricula)
+            
+            if not matricula or not uf or chave_composta in chaves_processadas:
                 continue
 
-            imovel_existente = imoveis_db_dict.get(matricula)
+            chaves_processadas.add(chave_composta)
+            imovel_existente = imoveis_db_dict.get(chave_composta)
             changed_fields = []
             change_type = None
             final_status = None
 
             if imovel_existente:
-                # Comparar dados para detectar mudanças
                 for key, new_value in imovel_dict.items():
-                    if hasattr(imovel_existente, key) and key not in ['MATRICULA', 'updated_at', 'Status']:
+                    if hasattr(imovel_existente, key) and key not in ['MATRICULA', 'UF', 'updated_at', 'Status']:
                         old_value = getattr(imovel_existente, key)
                         if str(old_value) != str(new_value):
                             changed_fields.append(key)
                             setattr(imovel_existente, key, new_value)
                 
-                # Determinar status baseado nas mudanças e status atual
                 if changed_fields:
                     final_status = 'Atualizado'
                     change_type = 'Atualizado'
                 else:
-                    # Se não há mudanças e estava como Atualizado, muda para Existente
                     if imovel_existente.Status == 'Atualizado':
                         final_status = 'Existente'
-                    # Se não há mudanças e estava como Novo, muda para Existente  
                     elif imovel_existente.Status == 'Novo':
                         final_status = 'Existente'
                     else:
@@ -117,46 +116,62 @@ def process_scraped_data(data):
                 
                 imovel_existente.Status = final_status
                 
-                if matricula in imoveis_db_dict:
-                    imoveis_db_dict.pop(matricula)
+                if chave_composta in imoveis_db_dict:
+                    imoveis_db_dict.pop(chave_composta)
 
             else:
-                # Imóvel completamente novo
-                imovel_novo_dict = {k: v for k, v in imovel_dict.items() if hasattr(Imovel, k)}
-                imovel_novo_dict['Status'] = 'Novo'
-                db.session.add(Imovel(**imovel_novo_dict))
-                change_type = 'Novo'
-                final_status = 'Novo'
+                imovel_existente_check = db.session.query(Imovel).filter_by(UF=uf, MATRICULA=matricula).first()
+                if not imovel_existente_check:
+                    imovel_novo_dict = {k: v for k, v in imovel_dict.items() if hasattr(Imovel, k)}
+                    imovel_novo_dict['Status'] = 'Novo'
+                    
+                    try:
+                        novo_imovel = Imovel(**imovel_novo_dict)
+                        db.session.add(novo_imovel)
+                        db.session.flush() 
+                        change_type = 'Novo'
+                        final_status = 'Novo'
+                    except Exception as e:
+                        logging.warning(f"Erro ao inserir imóvel {uf}-{matricula}: {e}")
+                        db.session.rollback()
+                        continue
+                else:
+                    for key, new_value in imovel_dict.items():
+                        if hasattr(imovel_existente_check, key) and key not in ['MATRICULA', 'UF', 'updated_at', 'Status']:
+                            old_value = getattr(imovel_existente_check, key)
+                            if str(old_value) != str(new_value):
+                                changed_fields.append(key)
+                                setattr(imovel_existente_check, key, new_value)
+                    
+                    if changed_fields:
+                        imovel_existente_check.Status = 'Atualizado'
+                        change_type = 'Atualizado'
+                    else:
+                        imovel_existente_check.Status = 'Existente'
 
-            # Criar registro de atualização apenas se houve mudança significativa
             if change_type:
                 atualizacao_dados = {
-                    k: imovel_dict.get(k) for k in ['MATRICULA', 'TIPO', 'UF', 'CIDADE', 'PRECO', 'LINK']
+                    k: imovel_dict.get(k) for k in ['MATRICULA', 'UF', 'TIPO', 'CIDADE', 'PRECO', 'LINK']
                     if k in imovel_dict
                 }
                 atualizacao_dados['Change'] = change_type
                 atualizacao_dados['ChangedFields'] = ",".join(changed_fields) if changed_fields else ""
 
-                # Buscar se já existe registro de atualização
-                existing_update = Atualizacao.query.filter_by(MATRICULA=matricula).first()
+                existing_update = Atualizacao.query.filter_by(UF=uf, MATRICULA=matricula).first()
                 if existing_update:
-                    # Atualizar registro existente
                     for key, value in atualizacao_dados.items():
                         setattr(existing_update, key, value)
                 else:
-                    # Criar novo registro
                     db.session.add(Atualizacao(**atualizacao_dados))
 
-        # Marcar imóveis que não foram encontrados como expirados
         if imoveis_db_dict:
-            matriculas_expiradas = list(imoveis_db_dict.keys())
-            logging.info(f"Marcando {len(matriculas_expiradas)} imóveis como expirados.")
+            chaves_expiradas = list(imoveis_db_dict.keys())
+            logging.info(f"Marcando {len(chaves_expiradas)} imóveis como expirados.")
             
-            for matricula, imovel in imoveis_db_dict.items():
+            for (uf, matricula), imovel in imoveis_db_dict.items():
                 imovel.Status = 'Expirado'
 
         try:
-            # Força a limpeza da sessão antes do commit final
             db.session.flush()
             db.session.commit()
             logging.info(f"Processamento concluído para os estados: {ufs_processados}")
