@@ -3,6 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 import time, os, glob, logging, re
 import unidecode
+import hashlib
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 PASTA_TEMPORARIOS = 'temporarios'
@@ -81,13 +82,15 @@ def processar_arquivos_csv():
     df_completo = pd.concat(todos_dados, ignore_index=True)
     df_completo.columns = [col.strip() for col in df_completo.columns]
     
+    # Mapeamento de colunas corrigido para lidar com diferentes nomes para matrícula
     mapeamento_colunas = {
-        'Nº do imóvel': 'ID_ANUNCIO',
+        'N° do imóvel': 'MATRICULA',
+        'Matrícula(s)': 'MATRICULA',
         'UF': 'UF', 'Cidade': 'CIDADE', 'Bairro': 'BAIRRO', 'Endereço': 'ENDERECO',
         'Preço': 'PRECO', 'Valor de avaliação': 'AVALIACAO', 'Desconto': 'DESCONTO',
-        'Descrição': 'DESCRICAO', 'Modalidade de venda': 'MODALIDADE', 'Link de acesso': 'LINK',
-        'Matrícula(s)': 'MATRICULA'
+        'Descrição': 'DESCRICAO', 'Modalidade de venda': 'MODALIDADE', 'Link de acesso': 'LINK'
     }
+    
     df_selecionado = df_completo.rename(columns=mapeamento_colunas)
     colunas_necessarias = list(mapeamento_colunas.values())
     df_final = df_selecionado[[col for col in colunas_necessarias if col in df_selecionado.columns]]
@@ -98,12 +101,17 @@ def processar_arquivos_csv():
     for idx, row in df_final.iterrows():
         yield {"type": "progress", "message": f'Processando imóvel {idx + 1} de {total_linhas}...'}
         desc_texto = str(row.get('DESCRICAO', '')).lower()
+        
+        matricula_value = row.get('MATRICULA', '')
+        if isinstance(matricula_value, pd.Series):
+            matricula_value = matricula_value.iloc[0]
+
         dados_linha = {
             'UF': row.get('UF'), 'CIDADE': row.get('CIDADE'), 'BAIRRO': row.get('BAIRRO'),
             'ENDERECO': row.get('ENDERECO'), 'PRECO': parse_valor(row.get('PRECO')),
             'AVALIACAO': parse_valor(row.get('AVALIACAO')), 'DESCONTO': row.get('DESCONTO'),
             'MODALIDADE': row.get('MODALIDADE'), 'LINK': row.get('LINK'),
-            'MATRICULA': str(row.get('MATRICULA', '')).strip() if pd.notna(row.get('MATRICULA')) else '',
+            'MATRICULA': str(matricula_value).strip() if pd.notna(matricula_value) else '',
             'TIPO': next((t for t in ['casa', 'apartamento', 'terreno'] if t in desc_texto), 'Não especificado'),
             'FGTS': 'Sim' if 'fgts' in desc_texto else 'Não',
             'FINANCIAMENTO': 'Sim' if 'financiamento' in desc_texto else 'Não',
@@ -123,16 +131,8 @@ def processar_arquivos_csv():
     if not df_final.empty:
         def criar_id_unico(row):
             matricula_original = str(row['MATRICULA']).strip() if pd.notna(row.get('MATRICULA')) and str(row.get('MATRICULA')).strip() else ''
-            if not matricula_original and pd.notna(row.get('LINK')):
-                if match := re.search(r'num_imovel=(\d+)', row['LINK']):
-                    matricula_original = match.group(1)
-            if not matricula_original or not matricula_original.isalnum():
-                return f"NA_IDX_{row.name}" 
             uf = str(row['UF']).strip().upper()
-            iniciais_bairro = _generate_address_initials(row.get('BAIRRO', ''))
-            if uf and matricula_original and iniciais_bairro:
-                return f"{uf}{matricula_original}{iniciais_bairro}"
-            else:
-                return f"NA_IDX_{row.name}"
+            iniciais_endereco = _generate_address_initials(row.get('ENDERECO', ''))
+            return f"{uf}{matricula_original}{iniciais_endereco}"
         df_final['MATRICULA'] = df_final.apply(criar_id_unico, axis=1)
     yield {"type": "scraping_done", "message": "Processamento concluído.", "data": df_final.to_dict('records')}
