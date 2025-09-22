@@ -197,35 +197,49 @@ def processar():
             f"data: {json.dumps({'type': 'error', 'message': 'Nenhum estado selecionado.'})}\n\n", 
             mimetype='text/event-stream'
         )
+
     def generate_events():
-        import app.datalogic as datalogic
-        try:
-            yield f"data: {json.dumps({'type': 'start', 'message': 'Iniciando processamento...', 'current': 0, 'total': 100})}\n\n"
-            total_steps = len(estados) + 3
-            current_step = 0
-            yield f"data: {json.dumps({'type': 'stage', 'message': 'Baixando listas dos estados...', 'current': current_step, 'total': total_steps})}\n\n"
-            for event in scraper.baixar_listas_por_estados(estados):
-                current_step += 1
-                event['current'] = current_step
-                event['total'] = total_steps
-                yield f"data: {json.dumps(event)}\n\n"
-            current_step += 1
-            yield f"data: {json.dumps({'type': 'stage', 'message': 'Processando arquivos CSV...', 'current': current_step, 'total': total_steps})}\n\n"
-            scraped_data = []
-            for event in scraper.processar_arquivos_csv():
-                if event.get('type') == 'scraping_done':
-                    scraped_data = event.get('data', [])
-                if 'current' not in event:
-                    event['current'] = current_step
-                    event['total'] = total_steps
-                yield f"data: {json.dumps(event)}\n\n"
-            current_step += 1
-            yield f"data: {json.dumps({'type': 'updating_status', 'message': 'Atualizando status dos imóveis...', 'current': current_step, 'total': total_steps})}\n\n"
-            datalogic.process_scraped_data(scraped_data)
-            yield f"data: {json.dumps({'type': 'done', 'message': 'Processo finalizado com sucesso!', 'current': total_steps, 'total': total_steps})}\n\n"
-        except Exception as e:
-            logging.error(f"Erro no stream de processamento: {e}", exc_info=True)
-            yield f"data: {json.dumps({'type': 'error', 'message': f'Erro no processamento: {str(e)}', 'current': 100, 'total': 100})}\n\n"
+        total_estados = len(estados)
+        total_imoveis_geral = 0
+        
+        yield f"data: {json.dumps({'type': 'start', 'total_states': total_estados})}\n\n"
+
+        for i, estado in enumerate(estados):
+            try:
+                yield f"data: {json.dumps({'type': 'download_start', 'state': estado})}\n\n"
+                for _ in scraper.baixar_listas_por_estados([estado]):
+                    pass  # Apenas consome o gerador
+                yield f"data: {json.dumps({'type': 'download_completed', 'state': estado})}\n\n"
+
+                caminho_arquivo = os.path.join('temporarios', f'{estado}.csv')
+                if not os.path.exists(caminho_arquivo):
+                    raise FileNotFoundError(f"Arquivo CSV para {estado} não foi encontrado.")
+
+                scraped_data = []
+                items_count = 0
+                for event in scraper.processar_arquivos_csv([caminho_arquivo]):
+                    if event.get('type') == 'scraping_done':
+                        scraped_data = event.get('data', [])
+                        items_count = len(scraped_data)
+                    elif event.get('type') == 'progress':
+                        yield f"data: {json.dumps({'type': 'state_progress', 'state': estado, 'current': event.get('current_item'), 'total': event.get('total_items')})}\n\n"
+                
+                yield f"data: {json.dumps({'type': 'csv_processed', 'state': estado, 'items_count': items_count})}\n\n"
+                
+                result_stats = {'new': 0, 'updated': 0}
+                if scraped_data:
+                    result_stats = datalogic.process_scraped_data(scraped_data)
+                    total_imoveis_geral = db.session.query(Imovel).count()
+
+                yield f"data: {json.dumps({'type': 'state_completed', 'state': estado, 'result': result_stats, 'current_state': i + 1, 'total_states': total_estados, 'total_properties': total_imoveis_geral})}\n\n"
+
+            except Exception as e:
+                logging.error(f"Erro no processamento do estado {estado}: {e}", exc_info=True)
+                yield f"data: {json.dumps({'type': 'error', 'message': f'Erro ao processar {estado}: {str(e)}'})}\n\n"
+                continue
+        
+        yield f"data: {json.dumps({'type': 'done', 'message': 'Processo finalizado com sucesso!', 'total_properties': total_imoveis_geral})}\n\n"
+
     response = Response(generate_events(), mimetype='text/event-stream')
     response.headers['Cache-Control'] = 'no-cache'
     response.headers['Connection'] = 'keep-alive'

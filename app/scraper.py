@@ -30,7 +30,17 @@ def limpar_pasta_temporarios():
 
 def baixar_listas_por_estados(estados):
     os.makedirs(PASTA_TEMPORARIOS, exist_ok=True)
-    limpar_pasta_temporarios()
+    if not estados:
+        return
+    
+    # Limpa apenas o CSV do estado que vai ser baixado, se existir
+    caminho_arquivo_antigo = os.path.join(PASTA_TEMPORARIOS, f'{estados[0]}.csv')
+    if os.path.exists(caminho_arquivo_antigo):
+        try:
+            os.remove(caminho_arquivo_antigo)
+        except OSError as e:
+            logging.error(f"Erro ao remover arquivo antigo {caminho_arquivo_antigo}: {e}")
+
     for estado in estados:
         yield {"type": "download", "message": f'Baixando lista de {estado}...'}
         url_download = f"https://venda-imoveis.caixa.gov.br/listaweb/Lista_imoveis_{estado}.csv"
@@ -41,7 +51,7 @@ def baixar_listas_por_estados(estados):
             with open(caminho_arquivo, 'wb') as f:
                 f.write(resposta.content)
             yield {"type": "download", "message": f"Lista de {estado} baixada."}
-            time.sleep(2)
+            time.sleep(1) 
         except requests.RequestException as e:
             yield {"type": "error", "message": f"Falha ao baixar lista de {estado}: {e}"}
 
@@ -66,9 +76,11 @@ def extrair_dados_pagina_imovel(url_imovel, modalidade):
         logging.error(f"Erro inesperado ao processar a página {url_imovel}: {e}")
     return dados_extras
 
-def processar_arquivos_csv():
+def processar_arquivos_csv(arquivos_csv=None):
+    if arquivos_csv is None:
+        arquivos_csv = glob.glob(os.path.join(PASTA_TEMPORARIOS, '*.csv'))
+
     todos_dados = []
-    arquivos_csv = glob.glob(os.path.join(PASTA_TEMPORARIOS, '*.csv'))
     for arquivo in arquivos_csv:
         try:
             df = pd.read_csv(arquivo, sep=';', encoding='latin-1', skiprows=2)
@@ -77,16 +89,16 @@ def processar_arquivos_csv():
         except Exception as e:
             logging.error(f"Erro ao processar o arquivo {arquivo}: {e}")
             
-    if not todos_dados: return pd.DataFrame()
-    
+    if not todos_dados:
+        yield {"type": "scraping_done", "message": "Nenhum dado para processar.", "data": []}
+        return
+
     df_completo = pd.concat(todos_dados, ignore_index=True)
     df_completo.columns = [col.strip() for col in df_completo.columns]
     
-    # Mapeamento de colunas corrigido para lidar com diferentes nomes para matrícula
     mapeamento_colunas = {
-        'N° do imóvel': 'MATRICULA',
-        'Matrícula(s)': 'MATRICULA',
-        'UF': 'UF', 'Cidade': 'CIDADE', 'Bairro': 'BAIRRO', 'Endereço': 'ENDERECO',
+        'N° do imóvel': 'MATRICULA', 'Matrícula(s)': 'MATRICULA', 'UF': 'UF', 
+        'Cidade': 'CIDADE', 'Bairro': 'BAIRRO', 'Endereço': 'ENDERECO',
         'Preço': 'PRECO', 'Valor de avaliação': 'AVALIACAO', 'Desconto': 'DESCONTO',
         'Descrição': 'DESCRICAO', 'Modalidade de venda': 'MODALIDADE', 'Link de acesso': 'LINK'
     }
@@ -99,7 +111,7 @@ def processar_arquivos_csv():
     total_linhas = len(df_final)
     
     for idx, row in df_final.iterrows():
-        yield {"type": "progress", "message": f'Processando imóvel {idx + 1} de {total_linhas}...'}
+        yield {"type": "progress", "current_item": idx + 1, "total_items": total_linhas}
         desc_texto = str(row.get('DESCRICAO', '')).lower()
         
         matricula_value = row.get('MATRICULA', '')
@@ -110,7 +122,7 @@ def processar_arquivos_csv():
             'UF': row.get('UF'), 'CIDADE': row.get('CIDADE'), 'BAIRRO': row.get('BAIRRO'),
             'ENDERECO': row.get('ENDERECO'), 'PRECO': parse_valor(row.get('PRECO')),
             'AVALIACAO': parse_valor(row.get('AVALIACAO')), 'DESCONTO': row.get('DESCONTO'),
-            'MODALIDADE': row.get('MODALIDADE'), 'LINK': row.get('LINK'),
+            'MODALidade': row.get('MODALIDADE'), 'LINK': row.get('LINK'),
             'MATRICULA': str(matricula_value).strip() if pd.notna(matricula_value) else '',
             'TIPO': next((t for t in ['casa', 'apartamento', 'terreno'] if t in desc_texto), 'Não especificado'),
             'FGTS': 'Sim' if 'fgts' in desc_texto else 'Não',
@@ -127,6 +139,7 @@ def processar_arquivos_csv():
                     dados_linha['PRECO'] = extras['PRECO']
                 dados_linha.update(extras)
         dados_processados.append(dados_linha)
+
     df_final = pd.DataFrame(dados_processados)
     if not df_final.empty:
         def criar_id_unico(row):
@@ -135,4 +148,5 @@ def processar_arquivos_csv():
             iniciais_endereco = _generate_address_initials(row.get('ENDERECO', ''))
             return f"{uf}{matricula_original}{iniciais_endereco}"
         df_final['MATRICULA'] = df_final.apply(criar_id_unico, axis=1)
+        
     yield {"type": "scraping_done", "message": "Processamento concluído.", "data": df_final.to_dict('records')}
