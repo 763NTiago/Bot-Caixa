@@ -1,0 +1,58 @@
+<div id="enhanced-progress-container" class="progress-container-fixed">
+    <div class="progress-header">
+        <div class="progress-title-enhanced">
+            <i class="bi bi-gear-fill"></i>
+            <span id="progress-main-title-enhanced">Processando Estados</span>
+        </div>
+        <button id="btn-stop-enhanced-scraping" class="btn-stop-enhanced">
+            <i class="bi bi-stop-fill"></i> Parar
+        </button>
+    </div>
+
+    <div class="progress-group">
+        <div class="progress-label-enhanced">
+            <span><i class="bi bi-map"></i> Progresso Geral</span>
+            <span id="overall-counter-enhanced">0/0 Estados</span>
+        </div>
+        <div class="progress-bar-main-enhanced">
+            <div id="main-progress-fill-enhanced" class="progress-fill-enhanced main" style="width: 0%;">
+                <span id="main-progress-text-enhanced"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="progress-group">
+        <div class="progress-label-enhanced">
+            <span id="current-state-label-enhanced"><i class="bi bi-download"></i> Estado Atual</span>
+            <span id="current-state-counter-enhanced">0/0 Itens</span>
+        </div>
+        <div class="progress-bar-current-enhanced">
+            <div id="current-progress-fill-enhanced" class="progress-fill-enhanced current" style="width: 0%;">
+                <span id="current-progress-text-enhanced"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="progress-info-grid-enhanced">
+        <div class="progress-info-item-enhanced states">
+            <div class="label"><i class="bi bi-map-fill"></i> Estados</div>
+            <div class="value" id="enhanced-states-processed">0/0</div>
+        </div>
+        <div class="progress-info-item-enhanced properties">
+            <div class="label"><i class="bi bi-house-fill"></i> Imóveis</div>
+            <div class="value" id="enhanced-total-properties">0</div>
+        </div>
+        <div class="progress-info-item-enhanced current-state">
+            <div class="label"><i class="bi bi-geo-alt"></i> Estado</div>
+            <div class="value" id="enhanced-current-state-name">Aguardando...</div>
+        </div>
+        <div class="progress-info-item-enhanced">
+            <div class="label"><i class="bi bi-clock"></i> Tempo</div>
+            <div class="value" id="enhanced-elapsed-time">00:00</div>
+        </div>
+    </div>
+
+    <div id="enhanced-progress-status" class="progress-status-enhanced">
+        Preparando para iniciar o processamento...
+    </div>
+</div>

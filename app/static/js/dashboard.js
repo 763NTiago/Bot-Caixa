@@ -18,6 +18,18 @@ class ProgressBar {
         $('#btn-stop-enhanced-scraping').on('click', () => this.stop());
     }
 
+    _beforeUnloadHandler(event) {
+        event.preventDefault();
+        event.returnValue = '';
+        return '';
+    }
+
+    _clearScrapingSession() {
+        sessionStorage.removeItem('scrapingInProgress');
+        sessionStorage.removeItem('scrapingStates');
+        window.removeEventListener('beforeunload', this._beforeUnloadHandler);
+    }
+
     show() {
         $('#enhanced-progress-container').addClass('show');
         this.isActive = true;
@@ -113,12 +125,22 @@ class ProgressBar {
             this.scrapingEventSource.close();
             this.scrapingEventSource = null;
         }
+        this._clearScrapingSession();
         this.updateStatus('Processamento interrompido pelo usuário', 'error');
         $('#btn-nova-raspagem').prop('disabled', false).html('<i class="bi bi-arrow-clockwise"></i> Nova Raspagem');
         setTimeout(() => this.hide(), 1500);
     }
 
     startScraping(selectedStates) {
+        if (!selectedStates || selectedStates.length === 0) {
+            alert('Por favor, selecione pelo menos um estado.');
+            return;
+        }
+
+        sessionStorage.setItem('scrapingInProgress', 'true');
+        sessionStorage.setItem('scrapingStates', JSON.stringify(selectedStates));
+        window.addEventListener('beforeunload', this._beforeUnloadHandler);
+
         this.show();
         this.totalStates = selectedStates.length;
         this.updateMainProgress(0, this.totalStates);
@@ -138,6 +160,7 @@ class ProgressBar {
         };
 
         this.scrapingEventSource.onerror = () => {
+            this._clearScrapingSession();
             this.updateStatus('Conexão com servidor perdida', 'error');
             setTimeout(() => this.hide(), 5000);
         };
@@ -213,16 +236,25 @@ class ProgressBar {
                 }
                 this.updateStatus(`Processamento finalizado! ${this.totalProperties} imóveis processados`, 'success');
 
+                this._clearScrapingSession();
                 $('#btn-nova-raspagem').prop('disabled', false).html('<i class="bi bi-arrow-clockwise"></i> Nova Raspagem');
 
                 setTimeout(() => {
                     this.hide();
-                    location.reload();
+                    // *** AJUSTE APLICADO AQUI ***
+                    // Atualiza os dados sem recarregar a página
+                    if (typeof table !== 'undefined' && table) {
+                        table.ajax.reload();
+                    }
+                    if (typeof loadSummaryData === 'function') {
+                        loadSummaryData();
+                    }
                 }, 3000);
                 break;
 
             case 'error':
                 this.updateStatus(`Erro: ${data.message}`, 'error');
+                this._clearScrapingSession();
                 $('#btn-nova-raspagem').prop('disabled', false).html('<i class="bi bi-arrow-clockwise"></i> Nova Raspagem');
                 setTimeout(() => this.hide(), 5000);
                 break;
@@ -538,13 +570,10 @@ $(document).ready(function() {
         const selectedEstados = Array.from(document.querySelectorAll('#estados-pesquisa-container input:checked'))
             .map(cb => cb.value);
 
-        if (selectedEstados.length === 0) {
-            alert('Por favor, selecione pelo menos um estado.');
-            return;
-        }
-
         const modal = bootstrap.Modal.getInstance(document.getElementById('pesquisaModal'));
-        modal.hide();
+        if (modal) {
+            modal.hide();
+        }
 
         progressBar.startScraping(selectedEstados);
     });
@@ -772,7 +801,9 @@ $(document).ready(function() {
         window.location.href = downloadUrl;
 
         const modal = bootstrap.Modal.getInstance(document.getElementById('exportModal'));
-        modal.hide();
+        if (modal) {
+            modal.hide();
+        }
     });
 
     $('#start-upload').on('click', function() {
@@ -809,7 +840,17 @@ $(document).ready(function() {
                 statusDiv.html(resultsHtml);
 
                 setTimeout(() => {
-                    location.reload();
+                    // *** AJUSTE APLICADO TAMBÉM AQUI ***
+                    if (typeof table !== 'undefined' && table) {
+                        table.ajax.reload();
+                    }
+                    if (typeof loadSummaryData === 'function') {
+                        loadSummaryData();
+                    }
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('uploadModal'));
+                    if (modal) {
+                       modal.hide();
+                    }
                 }, 4000);
             },
             error: function(jqXHR, textStatus, errorThrown) {
@@ -838,9 +879,19 @@ $(document).ready(function() {
         table.ajax.reload();
     });
 
+    function checkForOngoingScraping() {
+        if (sessionStorage.getItem('scrapingInProgress') === 'true') {
+            const states = JSON.parse(sessionStorage.getItem('scrapingStates'));
+            if (states && states.length > 0) {
+                progressBar.startScraping(states);
+            }
+        }
+    }
+
     updateFilters();
     loadSummaryData();
     populateFilters();
     loadStatesForActions();
     loadCheapProperties();
+    checkForOngoingScraping();
 });

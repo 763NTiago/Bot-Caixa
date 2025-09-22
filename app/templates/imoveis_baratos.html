@@ -7,85 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.5/font/bootstrap-icons.min.css" rel="stylesheet">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
-        :root {
-            --primary-color: #8e44ad; --secondary-color: #3498db; --background-start: #1a1a2e;
-            --background-end: #16213e; --card-bg: #1f2847; --text-color: #e0e0e0;
-            --border-color: #2c3e50; --font-family: 'Poppins', sans-serif;
-            --dark-text-color: #efeff3da; --orange-color: #f39c12;
-        }
-        body { 
-            background: linear-gradient(-45deg, var(--background-start), var(--background-end)); 
-            color: var(--text-color); 
-            font-family: var(--font-family); 
-        }
-        h1 { color: var(--secondary-color); font-weight: 600; }
-        .card { 
-            background-color: var(--card-bg); 
-            border: 1px solid var(--border-color); 
-            border-radius: 10px; 
-        }
-        
-        .dataTables_wrapper .dataTables_info,
-        .dataTables_wrapper .dataTables_paginate {
-            background-color: var(--card-bg); 
-            padding: 5px 10px;
-            border-radius: 5px;
-            color: var(--dark-text-color) !important; 
-        }
-        .dataTables_wrapper .dataTables_paginate .page-item .page-link {
-            background-color: var(--card-bg) !important;
-            color: var(--dark-text-color) !important;
-            border-color: var(--border-color) !important;
-        }
-        .dataTables_wrapper .dataTables_paginate .page-item.active .page-link {
-            background-color: var(--secondary-color) !important;
-            color: var(--text-color) !important; 
-            border-color: var(--secondary-color) !important;
-        }
-        .dataTables_wrapper .dataTables_length, 
-        .dataTables_wrapper .dataTables_filter { 
-            color: var(--text-color) !important; 
-        }
-
-        .table { 
-            --bs-table-bg: var(--card-bg); 
-            --bs-table-border-color: var(--border-color); 
-            --bs-table-striped-bg: #253154; 
-        }
-        .table tbody tr { cursor: pointer; }
-        .table tbody tr:hover { background-color: var(--secondary-color) !important; }
-        
-        .form-select, .form-control {
-            background-color: var(--card-bg);
-            color: var(--text-color);
-            border-color: var(--border-color);
-        }
-        .form-select option {
-            background-color: var(--card-bg);
-            color: var(--text-color);
-        }
-
-        .price-column { color: #2ecc71 !important; font-weight: 600; }
-        .discount-column { color: #e74c3c !important; font-weight: 600; }
-        .area-column { color: #3498db !important; }
-        .preco-m2-column { color: var(--orange-color) !important; font-weight: 600; }
-        .tipo-column { color: #9b59b6 !important; font-weight: 500; }
-
-        .status-novo { background: rgba(46, 204, 113, 0.2) !important; color: #2ecc71 !important; border: 1px solid #2ecc71 !important; }
-        .status-existente { background: rgba(52, 152, 219, 0.2) !important; color: #3498db !important; border: 1px solid #3498db !important; }
-        .status-atualizado { background: rgba(204, 255, 0, 0.2) !important; color: #ccff00 !important; border: 1px solid #ccff00 !important; }
-        .status-expirado { background: rgba(231, 76, 60, 0.2) !important; color: #e74c3c !important; border: 1px solid #e74c3c !important; }
-
-        .btn-warning {
-            background: linear-gradient(135deg, var(--orange-color), #e67e22);
-            color: white; border: none;
-        }
-        .btn-warning:hover { color: white; }
-        .filter-actions { display: flex; gap: 10px; }
-        @media (max-width: 768px) { .filter-actions { flex-direction: column; } }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 </head>
 <body>
     <div class="container-fluid px-4 mt-4">
@@ -197,10 +119,15 @@
             </div>
         </div>
     </div>
+
+    {% include '_progress_bar.html' %}
+
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
     <script>
+        // O JavaScript específico desta página continua aqui...
         $(document).ready(function() {
             const formatCurrency = (value) => {
                 if (!value || value === 0 || value === '0.00') return 'R$ 0,00';
