@@ -4,7 +4,6 @@ import io
 import logging
 import os
 import pandas as pd
-# A importação do 'create_app' é necessária para criar o contexto manualmente
 from app import datalogic, scraper, db, create_app
 from app.planilha import formatar_planilha_excel
 from app.models import Imovel, Atualizacao
@@ -14,7 +13,6 @@ from converter import convert_excel_to_db
 
 bp = Blueprint('main', __name__)
 
-# NENHUMA ALTERAÇÃO EM TODAS AS ROTAS ABAIXO
 @bp.route('/')
 def dashboard():
     return render_template('dashboard.html')
@@ -191,9 +189,6 @@ def comparacao_page():
         logging.error(f"Erro na página de comparação: {e}", exc_info=True)
         return render_template('comparacao.html', imoveis_agrupados={})
 
-# ========================================================================
-# ||               INÍCIO DA CORREÇÃO DO ERRO DE CONTEXTO               ||
-# ========================================================================
 @bp.route('/processar')
 def processar():
     estados = [uf.strip() for uf in request.args.get('estados', '').split(',') if uf.strip()]
@@ -203,13 +198,11 @@ def processar():
             mimetype='text/event-stream'
         )
 
-    # A função create_app() é chamada aqui para que possamos usar o 'app.app_context()'
     app = create_app()
 
     def generate_events():
         total_estados = len(estados)
         
-        # O 'with app.app_context()' garante que a chamada ao DB funcione
         with app.app_context():
             total_imoveis_geral = db.session.query(Imovel).count()
         
@@ -217,8 +210,8 @@ def processar():
 
         for i, estado in enumerate(estados):
             try:
-                # ... (download e scraping permanecem os mesmos) ...
                 yield f"data: {json.dumps({'type': 'state_start', 'state': estado, 'current_state': i + 1, 'total_states': total_estados})}\n\n"
+                
                 for event in scraper.baixar_listas_por_estados([estado]):
                     yield f"data: {json.dumps(event)}\n\n"
 
@@ -232,31 +225,59 @@ def processar():
                     if event.get('type') == 'scraping_done':
                         scraped_data = event.get('data', [])
                 
-                # A função process_scraped_data já cria seu próprio contexto, então não precisa ser alterada.
-                yield f"data: {json.dumps({'type': 'db_start', 'state': estado, 'message': f'Salvando {len(scraped_data)} imóveis de {estado} no banco...'})}\n\n"
+                yield f"data: {json.dumps({'type': 'db_start', 'state': estado, 'message': f'Iniciando salvamento de {len(scraped_data)} itens de {estado} no banco...'})}\n\n"
+                
                 if scraped_data:
+                    total_items = len(scraped_data)
+                    
+                    yield f"data: {json.dumps({'type': 'db_progress', 'state': estado, 'current': 0, 'total': total_items, 'message': f'Processando dados de {estado}...'})}\n\n"
+                    
                     datalogic.process_scraped_data(scraped_data)
+                    
+                    yield f"data: {json.dumps({'type': 'db_progress', 'state': estado, 'current': total_items, 'total': total_items, 'message': f'Salvamento de {estado} concluído'})}\n\n"
 
-                # O 'with' é usado novamente aqui para a contagem final do estado
                 with app.app_context():
                     total_imoveis_geral = db.session.query(Imovel).count()
+                    novos_estado = db.session.query(Imovel).filter(
+                        Imovel.UF == estado, 
+                        Imovel.Status == 'Novo'
+                    ).count()
+                    atualizados_estado = db.session.query(Imovel).filter(
+                        Imovel.UF == estado, 
+                        Imovel.Status == 'Atualizado'
+                    ).count()
                 
-                yield f"data: {json.dumps({'type': 'state_completed', 'state': estado, 'current_state': i + 1, 'total_states': total_estados, 'total_properties': total_imoveis_geral})}\n\n"
+                yield f"data: {json.dumps({
+                    'type': 'state_completed', 
+                    'state': estado, 
+                    'current_state': i + 1, 
+                    'total_states': total_estados, 
+                    'total_properties': total_imoveis_geral,
+                    'result': {
+                        'new': novos_estado,
+                        'updated': atualizados_estado,
+                        'total_processed': len(scraped_data)
+                    }
+                })}\n\n"
 
             except Exception as e:
                 logging.error(f"Erro no processamento do estado {estado}: {e}", exc_info=True)
                 yield f"data: {json.dumps({'type': 'error', 'message': f'Erro ao processar {estado}: {str(e)}'})}\n\n"
                 continue
         
-        yield f"data: {json.dumps({'type': 'done', 'message': 'Processo finalizado com sucesso!', 'total_properties': total_imoveis_geral})}\n\n"
+        with app.app_context():
+            total_imoveis_geral = db.session.query(Imovel).count()
+        
+        yield f"data: {json.dumps({
+            'type': 'done', 
+            'message': 'Processo finalizado com sucesso!', 
+            'total_properties': total_imoveis_geral
+        })}\n\n"
 
     response = Response(generate_events(), mimetype='text/event-stream')
     response.headers['Cache-Control'] = 'no-cache'
     response.headers['Connection'] = 'keep-alive'
     return response
-# ========================================================================
-# ||                  FIM DA CORREÇÃO DO ERRO DE CONTEXTO               ||
-# ========================================================================
 
 @bp.route('/upload_excel', methods=['POST'])
 def upload_excel():
