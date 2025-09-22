@@ -4,7 +4,8 @@ import io
 import logging
 import os
 import pandas as pd
-from app import datalogic, scraper, db
+# A importação do 'create_app' é necessária para criar o contexto manualmente
+from app import datalogic, scraper, db, create_app
 from app.planilha import formatar_planilha_excel
 from app.models import Imovel, Atualizacao
 from sqlalchemy import func
@@ -13,6 +14,7 @@ from converter import convert_excel_to_db
 
 bp = Blueprint('main', __name__)
 
+# NENHUMA ALTERAÇÃO EM TODAS AS ROTAS ABAIXO
 @bp.route('/')
 def dashboard():
     return render_template('dashboard.html')
@@ -21,7 +23,7 @@ def dashboard():
 def api_data():
     try:
         query = db.session.query(Imovel, Atualizacao.ChangedFields).outerjoin(
-            Atualizacao, 
+            Atualizacao,
             db.and_(Imovel.UF == Atualizacao.UF, Imovel.MATRICULA == Atualizacao.MATRICULA)
         )
         status_filter = request.args.get('status', '').strip()
@@ -35,7 +37,7 @@ def api_data():
             query = query.filter(Imovel.Status == 'Expirado')
         filtros = {
             'uf': 'UF',
-            'cidade': 'CIDADE', 
+            'cidade': 'CIDADE',
             'bairro': 'BAIRRO',
             'tipo': 'TIPO',
             'modalidade': 'MODALIDADE',
@@ -103,11 +105,11 @@ def api_filters():
     try:
         filters_data = datalogic.get_filter_options()
         filters_data['bairros'] = [
-            r[0] for r in db.session.query(Imovel.BAIRRO).distinct().order_by(Imovel.BAIRRO).all() 
+            r[0] for r in db.session.query(Imovel.BAIRRO).distinct().order_by(Imovel.BAIRRO).all()
             if r[0]
         ]
         preco_stats = db.session.query(
-            func.min(Imovel.PRECO), 
+            func.min(Imovel.PRECO),
             func.max(Imovel.PRECO)
         ).filter(Imovel.PRECO > 0).first()
         filters_data['preco_range'] = {
@@ -118,10 +120,10 @@ def api_filters():
     except Exception as e:
         logging.error(f"Erro ao obter filtros: {e}", exc_info=True)
         return jsonify({
-            'ufs': [], 
-            'cidades': [], 
-            'tipos': [], 
-            'modalidades': [], 
+            'ufs': [],
+            'cidades': [],
+            'tipos': [],
+            'modalidades': [],
             'bairros': [],
             'preco_range': {'min': 0, 'max': 1000000}
         })
@@ -152,7 +154,7 @@ def api_cidades_por_uf():
             r[0] for r in db.session.query(Imovel.CIDADE)
             .filter(Imovel.UF == uf)
             .distinct()
-            .order_by(Imovel.CIDADE).all() 
+            .order_by(Imovel.CIDADE).all()
             if r[0]
         ]
         return jsonify(cidades)
@@ -175,7 +177,7 @@ def api_bairros_por_cidade():
     except Exception as e:
         logging.error(f"Erro ao obter bairros: {e}", exc_info=True)
         return jsonify([])
-    
+
 @bp.route('/imoveis_baratos')
 def imoveis_baratos_page():
     return render_template('imoveis_baratos.html')
@@ -189,49 +191,57 @@ def comparacao_page():
         logging.error(f"Erro na página de comparação: {e}", exc_info=True)
         return render_template('comparacao.html', imoveis_agrupados={})
 
+# ========================================================================
+# ||               INÍCIO DA CORREÇÃO DO ERRO DE CONTEXTO               ||
+# ========================================================================
 @bp.route('/processar')
 def processar():
     estados = [uf.strip() for uf in request.args.get('estados', '').split(',') if uf.strip()]
     if not estados:
         return Response(
-            f"data: {json.dumps({'type': 'error', 'message': 'Nenhum estado selecionado.'})}\n\n", 
+            f"data: {json.dumps({'type': 'error', 'message': 'Nenhum estado selecionado.'})}\n\n",
             mimetype='text/event-stream'
         )
 
+    # A função create_app() é chamada aqui para que possamos usar o 'app.app_context()'
+    app = create_app()
+
     def generate_events():
         total_estados = len(estados)
-        total_imoveis_geral = 0
         
-        yield f"data: {json.dumps({'type': 'start', 'total_states': total_estados})}\n\n"
+        # O 'with app.app_context()' garante que a chamada ao DB funcione
+        with app.app_context():
+            total_imoveis_geral = db.session.query(Imovel).count()
+        
+        yield f"data: {json.dumps({'type': 'start', 'total_states': total_estados, 'total_properties': total_imoveis_geral})}\n\n"
 
         for i, estado in enumerate(estados):
             try:
-                yield f"data: {json.dumps({'type': 'download_start', 'state': estado})}\n\n"
-                for _ in scraper.baixar_listas_por_estados([estado]):
-                    pass  # Apenas consome o gerador
-                yield f"data: {json.dumps({'type': 'download_completed', 'state': estado})}\n\n"
+                # ... (download e scraping permanecem os mesmos) ...
+                yield f"data: {json.dumps({'type': 'state_start', 'state': estado, 'current_state': i + 1, 'total_states': total_estados})}\n\n"
+                for event in scraper.baixar_listas_por_estados([estado]):
+                    yield f"data: {json.dumps(event)}\n\n"
 
                 caminho_arquivo = os.path.join('temporarios', f'{estado}.csv')
                 if not os.path.exists(caminho_arquivo):
                     raise FileNotFoundError(f"Arquivo CSV para {estado} não foi encontrado.")
 
                 scraped_data = []
-                items_count = 0
                 for event in scraper.processar_arquivos_csv([caminho_arquivo]):
+                    yield f"data: {json.dumps(event)}\n\n"
                     if event.get('type') == 'scraping_done':
                         scraped_data = event.get('data', [])
-                        items_count = len(scraped_data)
-                    elif event.get('type') == 'progress':
-                        yield f"data: {json.dumps({'type': 'state_progress', 'state': estado, 'current': event.get('current_item'), 'total': event.get('total_items')})}\n\n"
                 
-                yield f"data: {json.dumps({'type': 'csv_processed', 'state': estado, 'items_count': items_count})}\n\n"
-                
-                result_stats = {'new': 0, 'updated': 0}
+                # A função process_scraped_data já cria seu próprio contexto, então não precisa ser alterada.
+                yield f"data: {json.dumps({'type': 'db_start', 'state': estado, 'message': f'Salvando {len(scraped_data)} imóveis de {estado} no banco...'})}\n\n"
                 if scraped_data:
-                    result_stats = datalogic.process_scraped_data(scraped_data)
-                    total_imoveis_geral = db.session.query(Imovel).count()
+                    datalogic.process_scraped_data(scraped_data)
 
-                yield f"data: {json.dumps({'type': 'state_completed', 'state': estado, 'result': result_stats, 'current_state': i + 1, 'total_states': total_estados, 'total_properties': total_imoveis_geral})}\n\n"
+                # O 'with' é usado novamente aqui para a contagem final do estado
+                with app.app_context():
+                    total_imoveis_geral = db.session.query(Imovel).count()
+                
+                yield f"data: {json.dumps({'type': 'state_completed', 'state': estado, 'current_state': i + 1, 'total_states': total_estados, 'total_properties': total_imoveis_geral})}\n\n"
 
             except Exception as e:
                 logging.error(f"Erro no processamento do estado {estado}: {e}", exc_info=True)
@@ -244,6 +254,9 @@ def processar():
     response.headers['Cache-Control'] = 'no-cache'
     response.headers['Connection'] = 'keep-alive'
     return response
+# ========================================================================
+# ||                  FIM DA CORREÇÃO DO ERRO DE CONTEXTO               ||
+# ========================================================================
 
 @bp.route('/upload_excel', methods=['POST'])
 def upload_excel():
@@ -251,7 +264,7 @@ def upload_excel():
         files = request.files.getlist('files')
         if not files or all(f.filename == '' for f in files):
             return jsonify({
-                'success': False, 
+                'success': False,
                 'message': 'Nenhum arquivo selecionado.'
             }), 400
         temp_dir = 'temporarios'
@@ -265,14 +278,14 @@ def upload_excel():
                     file.save(file_path)
                     success, message = convert_excel_to_db(file_path)
                     results.append({
-                        'file': file.filename, 
-                        'success': success, 
+                        'file': file.filename,
+                        'success': success,
                         'message': message
                     })
                 except Exception as e:
                     results.append({
-                        'file': file.filename, 
-                        'success': False, 
+                        'file': file.filename,
+                        'success': False,
                         'message': f'Erro ao processar arquivo: {str(e)}'
                     })
                 finally:

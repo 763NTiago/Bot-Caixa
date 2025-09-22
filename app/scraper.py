@@ -33,7 +33,6 @@ def baixar_listas_por_estados(estados):
     if not estados:
         return
     
-    # Limpa apenas o CSV do estado que vai ser baixado, se existir
     caminho_arquivo_antigo = os.path.join(PASTA_TEMPORARIOS, f'{estados[0]}.csv')
     if os.path.exists(caminho_arquivo_antigo):
         try:
@@ -58,6 +57,7 @@ def baixar_listas_por_estados(estados):
 def extrair_dados_pagina_imovel(url_imovel, modalidade):
     dados_extras = {}
     try:
+        time.sleep(0.1)
         response = requests.get(url_imovel, headers=HEADERS, timeout=60)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -122,7 +122,7 @@ def processar_arquivos_csv(arquivos_csv=None):
             'UF': row.get('UF'), 'CIDADE': row.get('CIDADE'), 'BAIRRO': row.get('BAIRRO'),
             'ENDERECO': row.get('ENDERECO'), 'PRECO': parse_valor(row.get('PRECO')),
             'AVALIACAO': parse_valor(row.get('AVALIACAO')), 'DESCONTO': row.get('DESCONTO'),
-            'MODALidade': row.get('MODALIDADE'), 'LINK': row.get('LINK'),
+            'MODALIDADE': row.get('MODALIDADE'), 'LINK': row.get('LINK'), 
             'MATRICULA': str(matricula_value).strip() if pd.notna(matricula_value) else '',
             'TIPO': next((t for t in ['casa', 'apartamento', 'terreno'] if t in desc_texto), 'Não especificado'),
             'FGTS': 'Sim' if 'fgts' in desc_texto else 'Não',
@@ -132,7 +132,7 @@ def processar_arquivos_csv(arquivos_csv=None):
         if m := re.search(r'(\d+[.,]?\d*)\s*de área privativa', desc_texto):
             dados_linha['AREA_PRIVATIVA'] = f"{m.group(1).replace(',', '.')} m²"
         if m := re.search(r'(\d+[.,]?\d*)\s*de área do terreno', desc_texto):
-            dados_linha['AREA_DO_TERRENO'] = f"{m.group(1).replace(',', '.')} m²"
+            dados_linha['AREA_DO_TERRENcO'] = f"{m.group(1).replace(',', '.')} m²"
         if pd.notna(dados_linha['LINK']):
             if extras := extrair_dados_pagina_imovel(dados_linha['LINK'], dados_linha['MODALIDADE']):
                 if 'PRECO' in extras:
