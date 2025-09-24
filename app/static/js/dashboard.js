@@ -241,8 +241,6 @@ class ProgressBar {
 
                 setTimeout(() => {
                     this.hide();
-                    // *** AJUSTE APLICADO AQUI ***
-                    // Atualiza os dados sem recarregar a página
                     if (typeof table !== 'undefined' && table) {
                         table.ajax.reload();
                     }
@@ -466,6 +464,7 @@ $(document).ready(function() {
         scrollX: true
     });
 
+    // CORREÇÃO: Função de inicialização do slider
     function initializePriceSlider(minPrice, maxPrice) {
         if (priceSlider) {
             priceSlider.destroy();
@@ -490,11 +489,17 @@ $(document).ready(function() {
         });
 
         priceSlider.on('update', function(values, handle) {
-            document.getElementById('price-min-value').textContent = formatCurrency(values[0]);
-            document.getElementById('price-max-value').textContent = formatCurrency(values[1]);
+            const minVal = Math.round(values[0]);
+            const maxVal = Math.round(values[1]);
+            document.getElementById('price-min-value').textContent = formatCurrency(minVal);
+            document.getElementById('price-max-value').textContent = formatCurrency(maxVal);
+            // Sincroniza o slider com os inputs de texto
+            $('#preco-min-filter').val(minVal);
+            $('#preco-max-filter').val(maxVal);
         });
     }
 
+    // CORREÇÃO: Função de atualização dos filtros
     function updateFilters() {
         currentFilters = {
             status: $('#status-filter').val() || '',
@@ -510,27 +515,28 @@ $(document).ready(function() {
         };
 
         const precoMin = $('#preco-min-filter').val();
-        const precoMax = $('#preco-max-filter').val();
-
         if (precoMin && precoMin !== '') {
             currentFilters.preco_min = parseFloat(precoMin);
-        } else if (priceSlider) {
-            const values = priceSlider.get();
-            currentFilters.preco_min = parseFloat(values[0]);
         }
 
+        const precoMax = $('#preco-max-filter').val();
         if (precoMax && precoMax !== '') {
             currentFilters.preco_max = parseFloat(precoMax);
-        } else if (priceSlider) {
-            const values = priceSlider.get();
-            currentFilters.preco_max = parseFloat(values[1]);
         }
     }
 
     $('#apply-filters').on('click', function() {
-
         updateFilters();
         table.ajax.reload();
+    });
+    
+    // CORREÇÃO: Sincroniza os inputs de texto com o slider
+    $('#preco-min-filter, #preco-max-filter').on('change', function() {
+        if (priceSlider) {
+            const minVal = $('#preco-min-filter').val() || priceSlider.options.range.min;
+            const maxVal = $('#preco-max-filter').val() || priceSlider.options.range.max;
+            priceSlider.set([minVal, maxVal]);
+        }
     });
 
     $('#uf-filter').on('change', function() {
@@ -676,6 +682,7 @@ $(document).ready(function() {
         });
     }
 
+    // CORREÇÃO: Função de popular os filtros
     function populateFilters() {
         $.get('/api/filters', function(data) {
             const filterMappings = {
@@ -686,10 +693,6 @@ $(document).ready(function() {
                 'cidade': {
                     data: data.cidades,
                     placeholder: 'Todas as Cidades'
-                },
-                'bairro': {
-                    data: data.bairros,
-                    placeholder: 'Todos os Bairros'
                 },
                 'tipo': {
                     data: data.tipos,
@@ -840,7 +843,6 @@ $(document).ready(function() {
                 statusDiv.html(resultsHtml);
 
                 setTimeout(() => {
-                    // *** AJUSTE APLICADO TAMBÉM AQUI ***
                     if (typeof table !== 'undefined' && table) {
                         table.ajax.reload();
                     }

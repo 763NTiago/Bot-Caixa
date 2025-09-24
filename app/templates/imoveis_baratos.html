@@ -126,220 +126,224 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+    
     <script>
-        // O JavaScript específico desta página continua aqui...
-        $(document).ready(function() {
-            const formatCurrency = (value) => {
-                if (!value || value === 0 || value === '0.00') return 'R$ 0,00';
-                const num = parseFloat(value);
-                if (isNaN(num)) return 'N/A';
-                return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-            };
+    $(document).ready(function() {
+        let filterableLocations = {};
 
-            const formatArea = (value) => {
-                if (!value || value === 'N/A' || value === 'null') return 'N/A';
-                if (typeof value === 'string' && value.includes('m²')) return value;
-                const num = parseFloat(value);
-                if (isNaN(num)) return 'N/A';
-                return `${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²`;
-            };
-
-            const calculatePricePerM2 = (preco, areaPrivativa, areaTerreno) => {
-                const price = parseFloat(preco);
-                if (isNaN(price) || price <= 0) return 'N/A';
-                let area = 0;
-                if (areaPrivativa && areaPrivativa !== 'N/A' && areaPrivativa !== 'null') {
-                    const areaPrivNum = parseFloat(areaPrivativa.toString().replace(/[^\d.,]/g, '').replace(',', '.'));
-                    if (!isNaN(areaPrivNum) && areaPrivNum > 0) area = areaPrivNum;
-                }
-                if (area === 0 && areaTerreno && areaTerreno !== 'N/A' && areaTerreno !== 'null') {
-                    const areaTerNum = parseFloat(areaTerreno.toString().replace(/[^\d.,]/g, '').replace(',', '.'));
-                    if (!isNaN(areaTerNum) && areaTerNum > 0) area = areaTerNum;
-                }
-                if (area <= 0) return 'N/A';
-                const pricePerM2 = price / area;
-                return `R$ ${pricePerM2.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-            };
-
-            const formatStatus = (status) => {
-                if (!status) status = 'Existente';
-                const statusClass = status.toLowerCase();
-                return `<span class="badge status-${statusClass}" style="padding: 0.3rem 0.8rem; border-radius: 15px; font-size: 0.8rem; font-weight: 600;">${status}</span>`;
-            };
-            
-            const table = $('#imoveis-baratos-table').DataTable({
-                processing: true,
-                serverSide: false,
-                ajax: {
-                    url: '/api/imoveis_baratos', 
-                    dataSrc: ''
-                },
-                columns: [
-                    { data: 'UF', defaultContent: 'N/A' },
-                    { data: 'CIDADE', defaultContent: 'N/A' },
-                    { data: 'BAIRRO', defaultContent: 'N/A' },
-                    { data: 'ENDERECO', defaultContent: 'N/A' },
-                    { 
-                        data: 'Status', 
-                        defaultContent: 'Existente',
-                        render: (data) => formatStatus(data)
-                    },
-                    { 
-                        data: 'PRECO', 
-                        defaultContent: '0',
-                        render: (data) => `<span class="price-column">${formatCurrency(data)}</span>`
-                    },
-                    { 
-                        data: 'AVALIACAO', 
-                        defaultContent: '0',
-                        render: (data) => `<span class="price-column">${formatCurrency(data)}</span>`
-                    },
-                    { 
-                        data: 'DESCONTO', 
-                        defaultContent: '0%',
-                        render: (data) => `<span class="discount-column">${data || '0%'}</span>`
-                    },
-                    { 
-                        data: 'AREA_PRIVATIVA', 
-                        defaultContent: 'N/A',
-                        render: (data) => `<span class="area-column">${formatArea(data)}</span>`
-                    },
-                    { 
-                        data: 'AREA_DO_TERRENO', 
-                        defaultContent: 'N/A',
-                        render: (data) => `<span class="area-column">${formatArea(data)}</span>`
-                    },
-                    { 
-                        data: null,
-                        defaultContent: 'N/A',
-                        render: (data, type, row) => `<span class="preco-m2-column">${calculatePricePerM2(row.PRECO, row.AREA_PRIVATIVA, row.AREA_DO_TERRENO)}</span>`
-                    },
-                    { 
-                        data: 'TIPO', 
-                        defaultContent: 'N/A',
-                        render: (data) => `<span class="tipo-column">${data || 'N/A'}</span>`
-                    },
-                    { data: 'MODALIDADE', defaultContent: 'N/A' },
-                    { data: 'DATA_DISPUTA', defaultContent: 'N/A' },
-                    { 
-                        data: 'FGTS', 
-                        defaultContent: 'NÃO',
-                        render: function(data) {
-                            const isFgts = data === 'SIM';
-                            return `<span class="badge ${isFgts ? 'bg-success' : 'bg-secondary'}">${isFgts ? 'Sim' : 'Não'}</span>`;
-                        }
-                    },
-                    { 
-                        data: 'FINANCIAMENTO', 
-                        defaultContent: 'NÃO',
-                        render: function(data) {
-                            const isFinanciamento = data === 'SIM';
-                            return `<span class="badge ${isFinanciamento ? 'bg-success' : 'bg-secondary'}">${isFinanciamento ? 'Sim' : 'Não'}</span>`;
-                        }
-                    }
-                ],
-                createdRow: function(row, data, dataIndex) { 
-                    $(row).on('click', function() { 
-                        if (data.LINK) { window.open(data.LINK, '_blank'); } 
-                    }); 
-                },
-                language: { url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json' },
-                order: [[5, 'asc']], 
-                pageLength: 25,
-                scrollX: true
-            });
-
-            function populateFilters() {
-                $.get('/api/filters', function(data) {
-                    ['ufs', 'tipos', 'modalidades'].forEach(key => {
-                        const selectId = `#${key.slice(0, -1)}-filter`;
-                        const select = $(selectId);
-                        const placeholder = select.find('option:first').text();
-                        select.html(`<option value="">${placeholder}</option>`);
-                        (data[key] || []).forEach(item => {
-                            select.append(`<option value="${item}">${item}</option>`);
-                        });
-                    });
-                });
+        const formatCurrency = (value) => {
+            if (!value || value === 0 || value === '0.00') return 'R$ 0,00';
+            const num = parseFloat(value);
+            if (isNaN(num)) return 'N/A';
+            return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        };
+        const formatArea = (value) => {
+            if (!value || value === 'N/A' || value === 'null') return 'N/A';
+            if (typeof value === 'string' && value.includes('m²')) return value;
+            const num = parseFloat(value);
+            if (isNaN(num)) return 'N/A';
+            return `${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²`;
+        };
+        const calculatePricePerM2 = (preco, areaPrivativa, areaTerreno) => {
+            const price = parseFloat(preco);
+            if (isNaN(price) || price <= 0) return 'N/A';
+            let area = 0;
+            if (areaPrivativa && areaPrivativa !== 'N/A' && areaPrivativa !== 'null') {
+                const areaPrivNum = parseFloat(areaPrivativa.toString().replace(/[^\d.,]/g, '').replace(',', '.'));
+                if (!isNaN(areaPrivNum) && areaPrivNum > 0) area = areaPrivNum;
             }
-
-            $('#uf-filter').on('change', function() {
-                const selectedUf = $(this).val();
-                $('#cidade-filter').html('<option value="">Todas as Cidades</option>');
-                $('#bairro-filter').html('<option value="">Todos os Bairros</option>');
-                if (selectedUf) {
-                    $.get('/api/cidades_por_uf', { uf: selectedUf }, function(cidades) {
-                        cidades.forEach(cidade => $('#cidade-filter').append(`<option value="${cidade}">${cidade}</option>`));
+            if (area === 0 && areaTerreno && areaTerreno !== 'N/A' && areaTerreno !== 'null') {
+                const areaTerNum = parseFloat(areaTerreno.toString().replace(/[^\d.,]/g, '').replace(',', '.'));
+                if (!isNaN(areaTerNum) && areaTerNum > 0) area = areaTerNum;
+            }
+            if (area <= 0) return 'N/A';
+            const pricePerM2 = price / area;
+            return `R$ ${pricePerM2.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        };
+        const formatStatus = (status) => {
+            if (!status) status = 'Existente';
+            const statusClass = status.toLowerCase();
+            return `<span class="badge status-${statusClass}" style="padding: 0.3rem 0.8rem; border-radius: 15px; font-size: 0.8rem; font-weight: 600;">${status}</span>`;
+        };
+        
+        const table = $('#imoveis-baratos-table').DataTable({
+            processing: true,
+            serverSide: false,
+            ajax: {
+                url: '/api/data',
+                data: function(d) {
+                    d.status = $('#status-filter').val();
+                    d.uf = $('#uf-filter').val();
+                    d.cidade = $('#cidade-filter').val();
+                    d.bairro = $('#bairro-filter').val();
+                    d.tipo = $('#tipo-filter').val();
+                    d.modalidade = $('#modalidade-filter').val();
+                    d.fgts = $('#fgts-filter').val();
+                    d.financiamento = $('#financiamento-filter').val();
+                    d.preco_min = $('#preco-min-filter').val();
+                    d.preco_max = $('#preco-max-filter').val() || '100000';
+                },
+                dataSrc: function(json) {
+                    // Filtrar apenas imóveis abaixo de 100k
+                    return json.filter(item => {
+                        const preco = parseFloat(item.PRECO);
+                        return !isNaN(preco) && preco < 100000;
                     });
                 }
-            });
+            },
+            columns: [
+                { data: 'UF', defaultContent: 'N/A' },
+                { data: 'CIDADE', defaultContent: 'N/A' },
+                { data: 'BAIRRO', defaultContent: 'N/A' },
+                { data: 'ENDERECO', defaultContent: 'N/A' },
+                { data: 'Status', defaultContent: 'Existente', render: (data) => formatStatus(data) },
+                { data: 'PRECO', defaultContent: '0', render: (data) => `<span class="price-column">${formatCurrency(data)}</span>` },
+                { data: 'AVALIACAO', defaultContent: '0', render: (data) => `<span class="price-column">${formatCurrency(data)}</span>` },
+                { data: 'DESCONTO', defaultContent: '0%', render: (data) => `<span class="discount-column">${data || '0%'}</span>` },
+                { data: 'AREA_PRIVATIVA', defaultContent: 'N/A', render: (data) => `<span class="area-column">${formatArea(data)}</span>` },
+                { data: 'AREA_DO_TERRENO', defaultContent: 'N/A', render: (data) => `<span class="area-column">${formatArea(data)}</span>` },
+                { data: null, defaultContent: 'N/A', render: (data, type, row) => `<span class="preco-m2-column">${calculatePricePerM2(row.PRECO, row.AREA_PRIVATIVA, row.AREA_DO_TERRENO)}</span>` },
+                { data: 'TIPO', defaultContent: 'N/A', render: (data) => `<span class="tipo-column">${data || 'N/A'}</span>` },
+                { data: 'MODALIDADE', defaultContent: 'N/A' },
+                { data: 'DATA_DISPUTA', defaultContent: 'N/A' },
+                { data: 'FGTS', defaultContent: 'NÃO', render: function(data) { return `<span class="badge ${data === 'SIM' ? 'bg-success' : 'bg-secondary'}">${data === 'SIM' ? 'Sim' : 'Não'}</span>`; } },
+                { data: 'FINANCIAMENTO', defaultContent: 'NÃO', render: function(data) { return `<span class="badge ${data === 'SIM' ? 'bg-success' : 'bg-secondary'}">${data === 'SIM' ? 'Sim' : 'Não'}</span>`; } }
+            ],
+            createdRow: function(row, data, dataIndex) { 
+                $(row).on('click', function() { 
+                    if (data.LINK) { window.open(data.LINK, '_blank'); } 
+                }); 
 
-            $('#cidade-filter').on('change', function() {
-                const selectedUf = $('#uf-filter').val();
-                const selectedCidade = $(this).val();
-                $('#bairro-filter').html('<option value="">Todos os Bairros</option>');
-                if (selectedCidade) {
-                    $.get('/api/bairros_por_cidade', { cidade: selectedCidade, uf: selectedUf }, function(bairros) {
-                        bairros.forEach(bairro => $('#bairro-filter').append(`<option value="${bairro}">${bairro}</option>`));
-                    });
-                }
-            });
+                // DESTAQUE GRANULAR - Igual ao dashboard
+                if (data.Status === 'Atualizado' && data.ChangedFields) {
+                    const changedFields = data.ChangedFields.split(',');
+                    const columnsMap = {
+                        'UF': 0,
+                        'CIDADE': 1,
+                        'BAIRRO': 2,
+                        'ENDERECO': 3,
+                        'Status': 4,
+                        'PRECO': 5,
+                        'AVALIACAO': 6,
+                        'DESCONTO': 7,
+                        'AREA_PRIVATIVA': 8,
+                        'AREA_DO_TERRENO': 9,
+                        'TIPO': 11,
+                        'MODALIDADE': 12,
+                        'DATA_DISPUTA': 13,
+                        'FGTS': 14,
+                        'FINANCIAMENTO': 15
+                    };
 
-            function applyClientSideFilters() {
-                let data = table.rows({ search: 'applied' }).data().toArray(); 
-                
-                const filters = {
-                    UF: $('#uf-filter').val(),
-                    CIDADE: $('#cidade-filter').val(),
-                    BAIRRO: $('#bairro-filter').val(),
-                    TIPO: $('#tipo-filter').val(),
-                    MODALIDADE: $('#modalidade-filter').val(),
-                    FGTS: $('#fgts-filter').val(),
-                    FINANCIAMENTO: $('#financiamento-filter').val(),
-                    preco_min: parseFloat($('#preco-min-filter').val()) || 0,
-                    preco_max: parseFloat($('#preco-max-filter').val()) || 100000,
-                    status: $('#status-filter').val()
-                };
-
-                table.clear();
-
-                const filteredData = data.filter(item => {
-                    let passes = true;
-                    ['UF', 'CIDADE', 'BAIRRO', 'TIPO', 'MODALIDADE', 'FGTS', 'FINANCIAMENTO'].forEach(key => {
-                        if (filters[key] && item[key] !== filters[key]) {
-                            passes = false;
+                    changedFields.forEach(fieldName => {
+                        const trimmedField = fieldName.trim();
+                        if (columnsMap.hasOwnProperty(trimmedField)) {
+                            const colIndex = columnsMap[trimmedField];
+                            $(row).find('td').eq(colIndex).addClass('cell-updated');
                         }
                     });
-
-                    if (filters.status && filters.status !== "Todos") {
-                        if (filters.status === "Ativos" && !['Novo', 'Existente', 'Atualizado'].includes(item.Status)) passes = false;
-                        else if (filters.status === "Apenas Novos" && item.Status !== 'Novo') passes = false;
-                        else if (filters.status === "Expirado" && item.Status !== 'Expirado') passes = false;
-                    }
-
-                    const preco = parseFloat(item.PRECO);
-                    if (preco < filters.preco_min || preco > filters.preco_max) {
-                        passes = false;
-                    }
-                    
-                    return passes;
-                });
-                
-                table.rows.add(filteredData).draw();
-            }
-
-            $('#clear-filters').on('click', function() {
-                $('select, input').val('');
-                $('#status-filter').val('Ativos');
-                table.ajax.reload();
-            });
-
-            $('#apply-filters').on('click', function() {
-                table.ajax.reload(applyClientSideFilters);
-            });
-
-            populateFilters();
+                }
+            },
+            language: { url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json' },
+            order: [[5, 'asc']], 
+            pageLength: 25,
+            scrollX: true
         });
+
+        function populateFilters() {
+            $.get('/api/baratos/filters', function(data) {
+                filterableLocations = data;
+                const ufSelect = $('#uf-filter');
+                const ufs = Object.keys(filterableLocations).sort();
+                ufs.forEach(uf => {
+                    ufSelect.append(`<option value="${uf}">${uf}</option>`);
+                });
+            }).fail(function() {
+                console.warn('API /api/baratos/filters não disponível. Usando filtros genéricos.');
+                populateGenericFilters();
+            });
+
+            $.get('/api/filters', function(data) {
+                const tipoSelect = $('#tipo-filter');
+                (data.tipos || []).forEach(item => tipoSelect.append(`<option value="${item}">${item}</option>`));
+                
+                const modSelect = $('#modalidade-filter');
+                (data.modalidades || []).forEach(item => modSelect.append(`<option value="${item}">${item}</option>`));
+            });
+        }
+
+        function populateGenericFilters() {
+            $.get('/api/data', { status: 'Todos' }, function(data) {
+                const locations = {};
+                data.forEach(item => {
+                    const preco = parseFloat(item.PRECO);
+                    if (!isNaN(preco) && preco < 100000) {
+                        const uf = item.UF || 'N/A';
+                        const cidade = item.CIDADE || 'N/A';
+                        const bairro = item.BAIRRO || 'N/A';
+                        
+                        if (!locations[uf]) locations[uf] = {};
+                        if (!locations[uf][cidade]) locations[uf][cidade] = [];
+                        if (!locations[uf][cidade].includes(bairro)) {
+                            locations[uf][cidade].push(bairro);
+                        }
+                    }
+                });
+                
+                filterableLocations = locations;
+                const ufSelect = $('#uf-filter');
+                const ufs = Object.keys(filterableLocations).sort();
+                ufs.forEach(uf => {
+                    ufSelect.append(`<option value="${uf}">${uf}</option>`);
+                });
+            });
+        }
+
+        $('#uf-filter').on('change', function() {
+            const selectedUf = $(this).val();
+            const cidadeSelect = $('#cidade-filter');
+            const bairroSelect = $('#bairro-filter');
+
+            cidadeSelect.html('<option value="">Todas as Cidades</option>');
+            bairroSelect.html('<option value="">Todos os Bairros</option>');
+
+            if (selectedUf && filterableLocations[selectedUf]) {
+                const cidades = Object.keys(filterableLocations[selectedUf]).sort();
+                cidades.forEach(cidade => {
+                    cidadeSelect.append(`<option value="${cidade}">${cidade}</option>`);
+                });
+            }
+        });
+
+        $('#cidade-filter').on('change', function() {
+            const selectedUf = $('#uf-filter').val();
+            const selectedCidade = $(this).val();
+            const bairroSelect = $('#bairro-filter');
+
+            bairroSelect.html('<option value="">Todos os Bairros</option>');
+
+            if (selectedUf && selectedCidade && filterableLocations[selectedUf][selectedCidade]) {
+                const bairros = filterableLocations[selectedUf][selectedCidade].sort();
+                bairros.forEach(bairro => {
+                    bairroSelect.append(`<option value="${bairro}">${bairro}</option>`);
+                });
+            }
+        });
+
+        $('#clear-filters').on('click', function() {
+            $('select, input').val('');
+            $('#status-filter').val('Ativos');
+            $('#cidade-filter').html('<option value="">Todas as Cidades</option>');
+            $('#bairro-filter').html('<option value="">Todos os Bairros</option>');
+            table.ajax.reload();
+        });
+
+        $('#apply-filters').on('click', function() {
+            table.ajax.reload();
+        });
+
+        populateFilters();
+    });
     </script>
 </body>
 </html>
